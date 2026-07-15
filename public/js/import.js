@@ -64,6 +64,22 @@ const ExcelImporter = {
     return map;
   },
 
+  parseNumber(val) {
+    if (val === undefined || val === null) return 0;
+    if (typeof val === 'number') return val;
+    const cleaned = String(val).replace(/[^0-9.-]/g, '');
+    const parsed = parseFloat(cleaned);
+    return isNaN(parsed) ? 0 : parsed;
+  },
+
+  parseIntNumber(val) {
+    if (val === undefined || val === null) return 0;
+    if (typeof val === 'number') return Math.floor(val);
+    const cleaned = String(val).replace(/[^0-9-]/g, '');
+    const parsed = parseInt(cleaned, 10);
+    return isNaN(parsed) ? 0 : parsed;
+  },
+
   // Transform raw sheet JSON data based on detected mapping
   transformData(rawJson, mapping, type) {
     return rawJson.map(row => {
@@ -79,10 +95,10 @@ const ExcelImporter = {
       } else {
         item.barcode = String(row[mapping.barcode] || '').trim();
         item.supplier = String(row[mapping.supplier] || 'Unknown').trim();
-        item.cost_price = parseFloat(row[mapping.cost_price]) || 0;
-        item.sale_price = parseFloat(row[mapping.sale_price]) || 0;
-        item.rappi_price = parseFloat(row[mapping.rappi_price]) || item.sale_price; // fallback to sale price
-        item.stock = parseInt(row[mapping.stock]) || 0;
+        item.cost_price = this.parseNumber(row[mapping.cost_price]);
+        item.sale_price = this.parseNumber(row[mapping.sale_price]);
+        item.rappi_price = this.parseNumber(row[mapping.rappi_price]) || item.sale_price; // fallback to sale price
+        item.stock = this.parseIntNumber(row[mapping.stock]);
         
         // Map extra product_name and category columns from inventory sheet
         item.product_name = String(row[mapping.product_name] || '').trim();
