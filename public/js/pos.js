@@ -245,11 +245,12 @@ const POS = {
       }))
     };
 
+    let localId;
     try {
       // 1. Transactionally write sale and adjust local stock in Dexie
       await db.transaction('rw', db.sales, db.products, async () => {
         // Save sale header (generates auto local_id)
-        const localId = await db.sales.add(saleRecord);
+        localId = await db.sales.add(saleRecord);
         
         // Update local stock for each product
         for (const item of saleRecord.items) {
