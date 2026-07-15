@@ -402,6 +402,23 @@
     </main>
   </div>
 
+  <!-- Custom Confirmation Modal -->
+  <div id="confirm-modal" class="modal-overlay hidden">
+    <div class="modal-card">
+      <div class="modal-header">
+        <span class="material-icons-outlined modal-icon text-danger">warning</span>
+        <h3>Void Transaction</h3>
+      </div>
+      <div class="modal-body">
+        <p id="confirm-modal-message">Are you absolutely sure you want to void this sale? This will permanently delete the transaction and return the items back to inventory stock.</p>
+      </div>
+      <div class="modal-footer">
+        <button id="confirm-modal-cancel" class="btn-secondary">Cancel</button>
+        <button id="confirm-modal-accept" class="btn-checkout" style="margin-top: 0; background: var(--color-danger); width: auto;">Void Sale</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Toast Notification Container -->
   <div id="toast-container" class="toast-container"></div>
 

@@ -349,7 +349,9 @@ const App = {
   // Void / delete a completed sale
   async deleteSale(serverId, localId) {
     console.log('[App] deleteSale invoked:', { serverId, localId });
-    if (!confirm('Are you absolutely sure you want to void this sale? This will permanently delete the transaction and return the items back to inventory stock.')) {
+    
+    const confirmed = await this.showConfirm('Are you absolutely sure you want to void this sale? This will permanently delete the transaction and return the items back to inventory stock.');
+    if (!confirmed) {
       console.log('[App] deleteSale cancelled by user');
       return;
     }
@@ -395,6 +397,35 @@ const App = {
       console.error('[App] Failed to delete sale:', err);
       POS.showToast(err.message, 'error');
     }
+  },
+
+  // Custom confirm dialog helper returning a Promise
+  async showConfirm(message) {
+    return new Promise((resolve) => {
+      const modal = document.getElementById('confirm-modal');
+      const msgEl = document.getElementById('confirm-modal-message');
+      const cancelBtn = document.getElementById('confirm-modal-cancel');
+      const acceptBtn = document.getElementById('confirm-modal-accept');
+
+      if (!modal) {
+        resolve(confirm(message));
+        return;
+      }
+
+      if (message) msgEl.innerText = message;
+      modal.classList.remove('hidden');
+
+      const cleanup = (result) => {
+        modal.classList.add('hidden');
+        // Clone elements to remove all attached listeners
+        cancelBtn.replaceWith(cancelBtn.cloneNode(true));
+        acceptBtn.replaceWith(acceptBtn.cloneNode(true));
+        resolve(result);
+      };
+
+      document.getElementById('confirm-modal-cancel').addEventListener('click', () => cleanup(false));
+      document.getElementById('confirm-modal-accept').addEventListener('click', () => cleanup(true));
+    });
   }
 };
 
