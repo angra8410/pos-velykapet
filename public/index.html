@@ -1,0 +1,416 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>VelyKaPet POS & Stock Management</title>
+  
+  <!-- Modern Fonts and Icons -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=Plus+Jakarta+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Outlined" rel="stylesheet">
+
+  <!-- Style Sheet -->
+  <link rel="stylesheet" href="/css/style.css">
+
+  <!-- CDNs for Local-First Operations -->
+  <script src="https://unpkg.com/dexie@3.2.4/dist/dexie.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+</head>
+<body>
+
+  <!-- App Header -->
+  <header class="app-header">
+    <div class="header-logo">
+      <span class="material-icons-outlined brand-icon">pets</span>
+      <div class="brand-text">
+        <h1>VelyKaPet</h1>
+        <span>POS & Inventory System</span>
+      </div>
+    </div>
+    
+    <!-- Sync Engine Status Widget -->
+    <div class="sync-widget">
+      <div id="sync-status-indicator" class="status-badge synced">
+        <span class="pulse-dot"></span>
+        <span id="sync-status-text">Connected</span>
+      </div>
+      <button class="btn-sync-now" onclick="SyncEngine.runSync()">
+        <span class="material-icons-outlined">sync</span>
+      </button>
+    </div>
+  </header>
+
+  <!-- App Container (Sidebar + Main View) -->
+  <div class="app-container">
+    
+    <!-- Navigation Sidebar -->
+    <nav class="sidebar">
+      <div class="nav-links">
+        <button class="nav-btn active" data-tab="tab-pos">
+          <span class="material-icons-outlined">shopping_cart</span>
+          <span>POS Checkout</span>
+        </button>
+        <button class="nav-btn" data-tab="tab-inventory">
+          <span class="material-icons-outlined">inventory_2</span>
+          <span>Inventory Stock</span>
+        </button>
+        <button class="nav-btn" data-tab="tab-import">
+          <span class="material-icons-outlined">publish</span>
+          <span>Excel Importer</span>
+        </button>
+        <button class="nav-btn" data-tab="tab-reports">
+          <span class="material-icons-outlined">bar_chart</span>
+          <span>Analytics Reports</span>
+        </button>
+      </div>
+      
+      <div class="sidebar-footer">
+        <span class="version-label">Version 1.0.0</span>
+      </div>
+    </nav>
+
+    <!-- Main Content Area -->
+    <main class="main-content">
+      
+      <!-- Tab 1: POS Checkout -->
+      <section id="tab-pos" class="tab-view active">
+        <div class="pos-grid">
+          
+          <!-- Left: Shopping Cart and Scanner -->
+          <div class="pos-cart-panel card">
+            <div class="panel-header">
+              <h2>Active Cart</h2>
+              <form id="pos-scan-form" class="scan-bar">
+                <span class="material-icons-outlined scan-icon">qr_code_scanner</span>
+                <input type="text" id="pos-scan-input" placeholder="Scan barcode or type barcode..." autocomplete="off" autofocus>
+                <button type="submit" class="btn-primary">Add</button>
+              </form>
+            </div>
+            
+            <div class="table-container">
+              <table class="cart-table">
+                <thead>
+                  <tr>
+                    <th>Product Details</th>
+                    <th class="text-right">Price</th>
+                    <th class="text-center">Qty</th>
+                    <th class="text-right">Subtotal</th>
+                    <th class="text-right">Est. Profit</th>
+                    <th class="text-center">Action</th>
+                  </tr>
+                </thead>
+                <tbody id="cart-items-tbody">
+                  <!-- Generated dynamically in pos.js -->
+                </tbody>
+              </table>
+            </div>
+
+            <div class="cart-footer">
+              <button id="pos-clear-btn" class="btn-danger-outline">
+                <span class="material-icons-outlined">delete_sweep</span>
+                <span>Clear Cart</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Right: Checkout Settings & Totals -->
+          <div class="pos-summary-panel">
+            
+            <!-- Summary Stats Card -->
+            <div class="card summary-totals-card">
+              <h3>Cart Summary</h3>
+              <div class="summary-row">
+                <span>Total Items:</span>
+                <span id="cart-total-items" class="summary-val">0</span>
+              </div>
+              <div class="summary-row">
+                <span>Est. Profit Margin:</span>
+                <span id="cart-total-profit" class="summary-val text-success">$0.00</span>
+              </div>
+              <div class="summary-divider"></div>
+              <div class="summary-row total">
+                <span>Total Amount:</span>
+                <span id="cart-total-amount" class="summary-val total-val">$0.00</span>
+              </div>
+            </div>
+
+            <!-- Transaction Config Form -->
+            <div class="card checkout-form-card">
+              <h3>Checkout Metadata</h3>
+              
+              <div class="form-group-grid">
+                <div class="form-group">
+                  <label for="pos-origin-select">Sale Origin</label>
+                  <select id="pos-origin-select">
+                    <option value="tienda">Tienda Física</option>
+                    <option value="Rappi">Rappi Delivery</option>
+                    <option value="WhatsApp">WhatsApp Order</option>
+                  </select>
+                </div>
+                <div class="form-group">
+                  <label for="pos-payment-select">Payment Method</label>
+                  <select id="pos-payment-select">
+                    <option value="Efectivo">Efectivo (Cash)</option>
+                    <option value="Nequi">Nequi</option>
+                    <option value="Bancolombia">Bancolombia Transfer</option>
+                    <option value="TC">Tarjeta de Crédito (TC)</option>
+                  </select>
+                </div>
+              </div>
+
+              <div class="form-group">
+                <label for="transaction-code">Transaction Reference / Code</label>
+                <input type="text" id="transaction-code" placeholder="Nequi ref, transfer code, or TC approval code..." autocomplete="off">
+              </div>
+
+              <div class="form-divider"></div>
+              <h4>Delivery Details (Required for Delivery Orders)</h4>
+              
+              <div class="form-group">
+                <label for="delivery-complex">Complex / Residential name</label>
+                <input type="text" id="delivery-complex" placeholder="Conjunto residencial, edificio..." autocomplete="off">
+              </div>
+              
+              <div class="form-group-grid">
+                <div class="form-group">
+                  <label for="delivery-tower">Tower / Block</label>
+                  <input type="text" id="delivery-tower" placeholder="Torre 4, Bloque B..." autocomplete="off">
+                </div>
+                <div class="form-group">
+                  <label for="delivery-apartment">Apartment</label>
+                  <input type="text" id="delivery-apartment" placeholder="Apto 402..." autocomplete="off">
+                </div>
+              </div>
+
+              <div class="form-group">
+                <label for="delivery-notes">Special Instructions / Notes</label>
+                <textarea id="delivery-notes" rows="2" placeholder="Leave at reception, call client on arrival..."></textarea>
+              </div>
+
+              <button id="pos-checkout-btn" class="btn-checkout">
+                <span class="material-icons-outlined">credit_score</span>
+                <span>Complete Checkout</span>
+              </button>
+            </div>
+
+          </div>
+        </div>
+      </section>
+
+      <!-- Tab 2: Inventory Stock View -->
+      <section id="tab-inventory" class="tab-view">
+        <div class="card">
+          <div class="panel-header">
+            <div>
+              <h2>Product Stock State</h2>
+              <p class="panel-subtitle">Current stock counters saved inside the browser database</p>
+            </div>
+            
+            <div class="header-actions">
+              <div class="search-bar">
+                <span class="material-icons-outlined">search</span>
+                <input type="text" id="inventory-search-input" placeholder="Search product name, barcode, supplier...">
+              </div>
+            </div>
+          </div>
+
+          <div class="table-container">
+            <table class="inventory-table">
+              <thead>
+                <tr>
+                  <th>Barcode</th>
+                  <th>Product Name</th>
+                  <th>Category</th>
+                  <th>Supplier</th>
+                  <th class="text-right">Cost Price</th>
+                  <th class="text-right">Retail Price</th>
+                  <th class="text-right">Rappi Price</th>
+                  <th class="text-center">Stock Level</th>
+                </tr>
+              </thead>
+              <tbody id="inventory-tbody">
+                <!-- Generated dynamically in app.js -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- Tab 3: Excel Importer Tab -->
+      <section id="tab-import" class="tab-view">
+        <div class="importer-grid">
+          
+          <!-- Importer Instructions Card -->
+          <div class="card help-card">
+            <h3>Migration Instructions</h3>
+            <p>Import your master spreadsheets here to transition your manual operations to this offline database.</p>
+            
+            <div class="help-step">
+              <span class="step-num">1</span>
+              <div>
+                <strong>Import Master Catalog first:</strong>
+                <p>Upload the <em>CODIGO DE BARRA</em> sheet. This maps static barcodes to names and categories.</p>
+              </div>
+            </div>
+
+            <div class="help-step">
+              <span class="step-num">2</span>
+              <div>
+                <strong>Import Live Inventory:</strong>
+                <p>Upload the <em>Inventario DEFINITIVO</em> sheet. This associates active costs, retail and Rappi pricing, and stock levels to those barcodes.</p>
+              </div>
+            </div>
+
+            <div class="help-divider"></div>
+            <div class="db-reset-zone">
+              <h4>Database Reset</h4>
+              <p>Warning: This will delete all local transaction data, product stock, and catalog references stored in this browser.</p>
+              <button onclick="if(confirm('Are you absolutely sure? This will wipe the browser DB.')) dbHelper.clearAll().then(() => alert('Local database cleared.'))" class="btn-danger-outline btn-block">
+                <span class="material-icons-outlined">delete_forever</span>
+                <span>Reset Local Database</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Importer Drop-Zones -->
+          <div class="importer-action-panel">
+            
+            <!-- Card 1: Catalog Upload -->
+            <div class="card drop-card">
+              <div class="card-icon catalog">
+                <span class="material-icons-outlined">dataset</span>
+              </div>
+              <div class="drop-info">
+                <h3>1. Master Catalog Spreadsheet</h3>
+                <p>Drop the spreadsheet or click to select file. Mapped from sheet <em>'CODIGO DE BARRA'</em></p>
+                <input type="file" id="file-catalog-input" accept=".xlsx, .xls, .csv" class="hidden-file-input">
+                <button class="btn-secondary" onclick="document.getElementById('file-catalog-input').click()">Select File</button>
+              </div>
+            </div>
+
+            <!-- Card 2: Inventory Upload -->
+            <div class="card drop-card">
+              <div class="card-icon inventory">
+                <span class="material-icons-outlined">inventory_2</span>
+              </div>
+              <div class="drop-info">
+                <h3>2. Live Inventory Stock Spreadsheet</h3>
+                <p>Drop the spreadsheet or click to select file. Mapped from sheet <em>'Inventario DEFINITIVO'</em></p>
+                <input type="file" id="file-inventory-input" accept=".xlsx, .xls, .csv" class="hidden-file-input">
+                <button class="btn-secondary" onclick="document.getElementById('file-inventory-input').click()">Select File</button>
+              </div>
+            </div>
+
+            <!-- Import Progress Indicator -->
+            <div id="import-progress-card" class="card progress-card hidden">
+              <h3 id="progress-title">Importing Data...</h3>
+              <div class="progress-bar-container">
+                <div id="progress-bar-fill" class="progress-bar-fill" style="width: 0%"></div>
+              </div>
+              <p id="progress-status" class="progress-status-text">Ready</p>
+            </div>
+
+          </div>
+
+        </div>
+      </section>
+
+      <!-- Tab 4: Analytics Reports Tab -->
+      <section id="tab-reports" class="tab-view">
+        <div class="reports-grid">
+          
+          <!-- KPI Summary Cards -->
+          <div class="kpi-card card">
+            <span class="material-icons-outlined kpi-icon revenue">payments</span>
+            <div class="kpi-details">
+              <span>Today's Revenue</span>
+              <h2 id="report-kpi-revenue">$0.00</h2>
+            </div>
+          </div>
+          
+          <div class="kpi-card card">
+            <span class="material-icons-outlined kpi-icon sales">receipt</span>
+            <div class="kpi-details">
+              <span>Today's Transactions</span>
+              <h2 id="report-kpi-sales">0</h2>
+            </div>
+          </div>
+
+          <div class="kpi-card card">
+            <span class="material-icons-outlined kpi-icon profit">trending_up</span>
+            <div class="kpi-details">
+              <span>Today's Estimated Profit</span>
+              <h2 id="report-kpi-profit" class="text-success">$0.00</h2>
+            </div>
+          </div>
+          
+          <!-- Sync Stats Summary -->
+          <div class="card report-sync-card">
+            <h3>Sync & Server Connection</h3>
+            <div class="sync-stat-row">
+              <span>Database URL host:</span>
+              <strong id="report-db-host">Postgres on Railway</strong>
+            </div>
+            <div class="sync-stat-row">
+              <span>Total Transactions on Server:</span>
+              <strong id="report-server-sales-count">Loading...</strong>
+            </div>
+            <div class="sync-stat-row">
+              <span>Last synced timestamp:</span>
+              <strong id="report-last-sync-time">Loading...</strong>
+            </div>
+          </div>
+
+          <!-- Sales Log Table -->
+          <div class="card sales-log-card col-span-2">
+            <div class="panel-header">
+              <h2>Recent Sales Log (Railway Postgres)</h2>
+              <button class="btn-secondary" onclick="App.loadReports()">
+                <span class="material-icons-outlined">refresh</span>
+                <span>Refresh Log</span>
+              </button>
+            </div>
+            
+            <div class="table-container">
+              <table class="report-table">
+                <thead>
+                  <tr>
+                    <th>Timestamp</th>
+                    <th>Origin</th>
+                    <th>Payment Method</th>
+                    <th>Items Count</th>
+                    <th class="text-right">Total Amount</th>
+                    <th>Delivery Apartment</th>
+                    <th>Notes</th>
+                  </tr>
+                </thead>
+                <tbody id="report-sales-tbody">
+                  <tr>
+                    <td colspan="7" class="text-center">Loading sales list from server...</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+        </div>
+      </section>
+
+    </main>
+  </div>
+
+  <!-- Toast Notification Container -->
+  <div id="toast-container" class="toast-container"></div>
+
+  <!-- Main JavaScript Files bootstrapping the application -->
+  <script src="/js/db.js"></script>
+  <script src="/js/api.js"></script>
+  <script src="/js/sync.js"></script>
+  <script src="/js/import.js"></script>
+  <script src="/js/pos.js"></script>
+  <script src="/js/app.js"></script>
+
+</body>
+</html>
