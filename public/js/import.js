@@ -15,13 +15,13 @@ const ExcelImporter = {
     },
     inventory: {
       barcode: ['codigo de barra', 'codigo de barras', 'codigo', 'barcode', 'codigos', 'barcodes'],
-      supplier: ['supplier', 'proveedor', 'marca', 'supplier_name'],
-      cost_price: ['cost_price', 'cost', 'costo', 'precio costo', 'costo_precio'],
-      sale_price: ['sale_price', 'price', 'precio', 'retail', 'venta', 'precio venta', 'sale'],
-      rappi_price: ['rappi_price', 'rappi', 'precio rappi', 'rappi price'],
-      stock: ['stock', 'cantidad', 'inventario', 'qty', 'quantity', 'existencias'],
+      supplier: ['proveedor', 'supplier', 'marca', 'supplier_name'],
+      cost_price: ['costo unitario', 'cost_price', 'cost', 'costo', 'precio costo', 'costo_precio'],
+      sale_price: ['precio final venta', 'precio venta', 'sale_price', 'price', 'precio', 'retail', 'venta', 'sale'],
+      rappi_price: ['precio rappi', 'rappi_price', 'rappi', 'rappi price'],
+      stock: ['stock actual', 'stock_actual', 'stock', 'cantidad', 'inventario', 'qty', 'quantity', 'existencias'],
       // Extra fields to automatically populate master_catalog from inventory sheet if missing
-      product_name: ['product_name', 'product', 'producto', 'name', 'nombre', 'descripcion', 'description'],
+      product_name: ['nombre producto', 'product_name', 'product', 'producto', 'name', 'nombre', 'descripcion', 'description'],
       category: ['category', 'categoria', 'tipo', 'group', 'grupo']
     }
   },
