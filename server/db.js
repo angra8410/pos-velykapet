@@ -1,10 +1,11 @@
 const { Pool } = require('pg');
 
-// Railway connections (both internal private network and public TCP proxy)
-// do NOT use client-side SSL — the proxy handles transport security externally.
+const dbUrl = process.env.DATABASE_URL || '';
+const isRailwayInternal = dbUrl.includes('railway.internal');
+
 const pool = new Pool({
-  connectionString: process.env.DATABASE_URL || '',
-  ssl: false,
+  connectionString: dbUrl,
+  ssl: isRailwayInternal ? false : { rejectUnauthorized: false },
 });
 
 // Verify connection on startup — non-fatal so the healthcheck

@@ -10,10 +10,11 @@ const fs = require('fs');
 const path = require('path');
 
 const dbUrl = process.env.DATABASE_URL || '';
+const isRailwayInternal = dbUrl.includes('railway.internal');
 
 const pool = new Pool({
   connectionString: dbUrl,
-  ssl: false,
+  ssl: isRailwayInternal ? false : { rejectUnauthorized: false },
 });
 
 async function runMigrations() {
