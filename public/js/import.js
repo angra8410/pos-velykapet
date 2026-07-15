@@ -10,8 +10,8 @@ const ExcelImporter = {
   mappings: {
     catalog: {
       barcode: ['codigo de barra', 'codigo de barras', 'codigo', 'barcode', 'barcodes', 'codigos'],
-      product_name: ['product_name', 'product', 'producto', 'name', 'nombre', 'descripcion', 'description'],
-      category: ['category', 'categoria', 'tipo', 'group', 'grupo']
+      product_name: ['nombre producto', 'product_name', 'product', 'producto', 'name', 'nombre', 'descripción', 'descripcion', 'description'],
+      category: ['categoría', 'categoria', 'category', 'tipo', 'group', 'grupo']
     },
     inventory: {
       barcode: ['codigo de barra', 'codigo de barras', 'codigo', 'barcode', 'codigos', 'barcodes'],
@@ -21,8 +21,8 @@ const ExcelImporter = {
       rappi_price: ['precio rappi', 'rappi_price', 'rappi', 'rappi price'],
       stock: ['stock actual', 'stock_actual', 'stock', 'cantidad', 'inventario', 'qty', 'quantity', 'existencias'],
       // Extra fields to automatically populate master_catalog from inventory sheet if missing
-      product_name: ['nombre producto', 'product_name', 'product', 'producto', 'name', 'nombre', 'descripcion', 'description'],
-      category: ['category', 'categoria', 'tipo', 'group', 'grupo']
+      product_name: ['nombre producto', 'product_name', 'product', 'producto', 'name', 'nombre', 'descripción', 'descripcion', 'description'],
+      category: ['categoría', 'categoria', 'category', 'tipo', 'group', 'grupo']
     }
   },
   
