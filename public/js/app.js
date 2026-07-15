@@ -348,7 +348,9 @@ const App = {
 
   // Void / delete a completed sale
   async deleteSale(serverId, localId) {
+    console.log('[App] deleteSale invoked:', { serverId, localId });
     if (!confirm('Are you absolutely sure you want to void this sale? This will permanently delete the transaction and return the items back to inventory stock.')) {
+      console.log('[App] deleteSale cancelled by user');
       return;
     }
 
