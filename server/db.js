@@ -1,13 +1,10 @@
 const { Pool } = require('pg');
 
-// Railway's internal private network (postgres.railway.internal) does NOT use SSL.
-// SSL is only needed for external/public connections.
-const dbUrl = process.env.DATABASE_URL || '';
-const isRailwayInternal = dbUrl.includes('railway.internal');
-
+// Railway connections (both internal private network and public TCP proxy)
+// do NOT use client-side SSL — the proxy handles transport security externally.
 const pool = new Pool({
-  connectionString: dbUrl,
-  ssl: isRailwayInternal ? false : { rejectUnauthorized: false },
+  connectionString: process.env.DATABASE_URL || '',
+  ssl: false,
 });
 
 // Verify connection on startup — non-fatal so the healthcheck
