@@ -80,13 +80,24 @@
           
           <!-- Left: Shopping Cart and Scanner -->
           <div class="pos-cart-panel card">
-            <div class="panel-header">
+            <div class="panel-header" style="flex-wrap: wrap; gap: 12px;">
               <h2>Active Cart</h2>
-              <form id="pos-scan-form" class="scan-bar">
-                <span class="material-icons-outlined scan-icon">qr_code_scanner</span>
-                <input type="text" id="pos-scan-input" placeholder="Scan barcode or type barcode..." autocomplete="off" autofocus>
-                <button type="submit" class="btn-primary">Add</button>
-              </form>
+              <div class="pos-input-group" style="display: flex; gap: 12px; flex-grow: 1; justify-content: flex-end; flex-wrap: wrap;">
+                <!-- Scan Form -->
+                <form id="pos-scan-form" class="scan-bar" style="margin: 0; min-width: 250px;">
+                  <span class="material-icons-outlined scan-icon">qr_code_scanner</span>
+                  <input type="text" id="pos-scan-input" placeholder="Scan/Type Barcode..." autocomplete="off" autofocus>
+                  <button type="submit" class="btn-primary">Add</button>
+                </form>
+                <!-- Search Box -->
+                <div class="search-to-add-container" style="position: relative; min-width: 280px; flex-grow: 1; max-width: 400px;">
+                  <div class="scan-bar" style="margin: 0; width: 100%;">
+                    <span class="material-icons-outlined scan-icon">search</span>
+                    <input type="text" id="pos-search-input" placeholder="Search product by name..." autocomplete="off">
+                  </div>
+                  <div id="pos-search-dropdown" class="search-dropdown hidden"></div>
+                </div>
+              </div>
             </div>
             
             <div class="table-container">
@@ -202,17 +213,27 @@
       <!-- Tab 2: Inventory Stock View -->
       <section id="tab-inventory" class="tab-view">
         <div class="card">
-          <div class="panel-header">
+          <div class="panel-header" style="flex-wrap: wrap; gap: 12px;">
             <div>
               <h2>Product Stock State</h2>
               <p class="panel-subtitle">Current stock counters saved inside the browser database</p>
             </div>
             
-            <div class="header-actions">
-              <div class="search-bar">
+            <div class="header-actions" style="display: flex; gap: 12px; flex-grow: 1; justify-content: flex-end; flex-wrap: wrap; align-items: center;">
+              <!-- Scanner Ingest Form -->
+              <form id="inventory-scan-form" class="scan-bar" style="margin: 0; min-width: 250px;">
+                <span class="material-icons-outlined scan-icon">qr_code_scanner</span>
+                <input type="text" id="inventory-scan-input" placeholder="Scan Barcode to Edit/Add..." autocomplete="off">
+              </form>
+              <!-- Search Bar -->
+              <div class="search-bar" style="margin: 0;">
                 <span class="material-icons-outlined">search</span>
                 <input type="text" id="inventory-search-input" placeholder="Search product name, barcode, supplier...">
               </div>
+              <button class="btn-primary" onclick="App.openNewProductModal()" style="display: flex; align-items: center; gap: 6px; cursor: pointer; height: 38px;">
+                <span class="material-icons-outlined">add_circle_outline</span>
+                <span>Add Product</span>
+              </button>
             </div>
           </div>
 
@@ -228,6 +249,7 @@
                   <th class="text-right">Retail Price</th>
                   <th class="text-right">Rappi Price</th>
                   <th class="text-center">Stock Level</th>
+                  <th class="text-center">Action</th>
                 </tr>
               </thead>
               <tbody id="inventory-tbody">
@@ -416,6 +438,71 @@
         <button id="confirm-modal-cancel" class="btn-secondary">Cancel</button>
         <button id="confirm-modal-accept" class="btn-checkout" style="margin-top: 0; background: var(--color-danger); width: auto;">Void Sale</button>
       </div>
+    </div>
+  </div>
+
+  <!-- Custom Product Adjust/Add Modal -->
+  <div id="inventory-modal" class="modal-overlay hidden">
+    <div class="modal-card" style="width: 500px; max-width: 95%;">
+      <div class="modal-header">
+        <span class="material-icons-outlined modal-icon text-primary" id="inventory-modal-icon">inventory_2</span>
+        <h3 id="inventory-modal-title">Adjust Product Stock</h3>
+      </div>
+      <form id="inventory-modal-form" onsubmit="App.saveAdjustment(event)">
+        <div class="modal-body" style="display: flex; flex-direction: column; gap: 14px; text-align: left;">
+          <!-- Barcode -->
+          <div class="form-group">
+            <label for="inv-modal-barcode" style="font-weight: 500; font-size: 13px; color: var(--text-main); margin-bottom: 6px; display: block;">Barcode *</label>
+            <input type="text" id="inv-modal-barcode" required placeholder="Scan or type barcode..." class="form-control" style="width: 100%; box-sizing: border-box; background: var(--bg-card); border: 1px solid var(--border-color); border-radius: var(--radius-sm); padding: 10px; color: var(--text-main);">
+          </div>
+          <!-- Product Name -->
+          <div class="form-group">
+            <label for="inv-modal-name" style="font-weight: 500; font-size: 13px; color: var(--text-main); margin-bottom: 6px; display: block;">Product Name *</label>
+            <input type="text" id="inv-modal-name" required placeholder="Evolve Perro Classic..." class="form-control" style="width: 100%; box-sizing: border-box; background: var(--bg-card); border: 1px solid var(--border-color); border-radius: var(--radius-sm); padding: 10px; color: var(--text-main);">
+          </div>
+          <!-- Category and Supplier -->
+          <div class="form-group-grid" style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+            <div class="form-group">
+              <label for="inv-modal-category" style="font-weight: 500; font-size: 13px; color: var(--text-main); margin-bottom: 6px; display: block;">Category *</label>
+              <input type="text" id="inv-modal-category" required placeholder="SNACKS, ARENA, etc..." class="form-control" style="width: 100%; box-sizing: border-box; background: var(--bg-card); border: 1px solid var(--border-color); border-radius: var(--radius-sm); padding: 10px; color: var(--text-main);">
+            </div>
+            <div class="form-group">
+              <label for="inv-modal-supplier" style="font-weight: 500; font-size: 13px; color: var(--text-main); margin-bottom: 6px; display: block;">Supplier</label>
+              <input type="text" id="inv-modal-supplier" placeholder="Proveedor / CDM..." class="form-control" style="width: 100%; box-sizing: border-box; background: var(--bg-card); border: 1px solid var(--border-color); border-radius: var(--radius-sm); padding: 10px; color: var(--text-main);">
+            </div>
+          </div>
+          <!-- Cost, Retail, Rappi Prices -->
+          <div class="form-group-grid" style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px;">
+            <div class="form-group">
+              <label for="inv-modal-cost" style="font-weight: 500; font-size: 13px; color: var(--text-main); margin-bottom: 6px; display: block;">Cost Price ($)</label>
+              <input type="number" id="inv-modal-cost" step="0.01" min="0" placeholder="0.00" class="form-control" style="width: 100%; box-sizing: border-box; background: var(--bg-card); border: 1px solid var(--border-color); border-radius: var(--radius-sm); padding: 10px; color: var(--text-main);">
+            </div>
+            <div class="form-group">
+              <label for="inv-modal-retail" style="font-weight: 500; font-size: 13px; color: var(--text-main); margin-bottom: 6px; display: block;">Retail Price ($)</label>
+              <input type="number" id="inv-modal-retail" step="0.01" min="0" placeholder="0.00" class="form-control" style="width: 100%; box-sizing: border-box; background: var(--bg-card); border: 1px solid var(--border-color); border-radius: var(--radius-sm); padding: 10px; color: var(--text-main);">
+            </div>
+            <div class="form-group">
+              <label for="inv-modal-rappi" style="font-weight: 500; font-size: 13px; color: var(--text-main); margin-bottom: 6px; display: block;">Rappi Price ($)</label>
+              <input type="number" id="inv-modal-rappi" step="0.01" min="0" placeholder="0.00" class="form-control" style="width: 100%; box-sizing: border-box; background: var(--bg-card); border: 1px solid var(--border-color); border-radius: var(--radius-sm); padding: 10px; color: var(--text-main);">
+            </div>
+          </div>
+          <!-- Stock Level Adjustment -->
+          <div class="form-group-grid" style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+            <div class="form-group">
+              <label for="inv-modal-stock" style="font-weight: 500; font-size: 13px; color: var(--text-main); margin-bottom: 6px; display: block;">Current Stock</label>
+              <input type="number" id="inv-modal-stock" value="0" readonly style="width: 100%; box-sizing: border-box; background: var(--border-color); border: 1px solid var(--border-color); border-radius: var(--radius-sm); padding: 10px; color: var(--text-muted);">
+            </div>
+            <div class="form-group">
+              <label for="inv-modal-adjust" style="font-weight: 500; font-size: 13px; color: var(--text-main); margin-bottom: 6px; display: block;">Add / Subtract Qty</label>
+              <input type="number" id="inv-modal-adjust" value="0" placeholder="e.g. 10 or -5" class="form-control" style="width: 100%; box-sizing: border-box; background: var(--bg-card); border: 1px solid var(--border-color); border-radius: var(--radius-sm); padding: 10px; color: var(--text-main);">
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer" style="margin-top: 20px; display: flex; justify-content: flex-end; gap: 12px;">
+          <button type="button" class="btn-secondary" onclick="App.closeInventoryModal()">Cancel</button>
+          <button type="submit" class="btn-checkout" style="margin-top: 0; width: auto; background-color: var(--color-primary); border: none;">Save Product</button>
+        </div>
+      </form>
     </div>
   </div>
 

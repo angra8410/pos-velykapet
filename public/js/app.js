@@ -12,6 +12,7 @@ const App = {
     this.setupRouter();
     this.setupImporterUI();
     this.setupSearch();
+    this.setupInventoryScanner();
     
     // Bootstrap other modules
     SyncEngine.init();
@@ -173,8 +174,8 @@ const App = {
       if (products.length === 0) {
         tbody.innerHTML = `
           <tr>
-            <td colspan="8" class="text-center" style="padding: 40px 0;">
-              No products found. Go to <strong>Excel Importer</strong> to import products.
+            <td colspan="9" class="text-center" style="padding: 40px 0;">
+              No products found. Go to <strong>Excel Importer</strong> or click <strong>Add Product</strong>.
             </td>
           </tr>
         `;
@@ -201,6 +202,11 @@ const App = {
             <td class="text-right">$${Number(p.rappi_price).toFixed(2)}</td>
             <td class="text-center">
               <span class="stock-pill ${stockClass}">${stock} units</span>
+            </td>
+            <td class="text-center">
+              <button class="btn-icon" onclick="App.openAdjustmentModal('${p.barcode}')" style="color: var(--color-primary); cursor: pointer;">
+                <span class="material-icons-outlined">edit</span>
+              </button>
             </td>
           </tr>
         `;
@@ -426,6 +432,169 @@ const App = {
       document.getElementById('confirm-modal-cancel').addEventListener('click', () => cleanup(false));
       document.getElementById('confirm-modal-accept').addEventListener('click', () => cleanup(true));
     });
+  },
+
+  // Scanner form inside Inventory Stock tab
+  setupInventoryScanner() {
+    const scanForm = document.getElementById('inventory-scan-form');
+    const scanInput = document.getElementById('inventory-scan-input');
+    if (!scanForm || !scanInput) return;
+
+    scanForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const barcode = scanInput.value.trim();
+      if (!barcode) return;
+
+      scanInput.value = '';
+      scanInput.blur();
+      
+      const product = await db.products.get(barcode);
+      if (product) {
+        this.openAdjustmentModal(barcode);
+      } else {
+        this.openNewProductModal(barcode);
+      }
+    });
+  },
+
+  // Open modal in registration mode
+  openNewProductModal(prefilledBarcode = '') {
+    const modal = document.getElementById('inventory-modal');
+    if (!modal) return;
+
+    document.getElementById('inventory-modal-title').innerText = 'Register New Product';
+    document.getElementById('inventory-modal-icon').className = 'material-icons-outlined modal-icon text-success';
+    
+    const barcodeInput = document.getElementById('inv-modal-barcode');
+    barcodeInput.value = prefilledBarcode;
+    barcodeInput.removeAttribute('readonly');
+    barcodeInput.style.backgroundColor = '';
+    barcodeInput.style.color = '';
+
+    document.getElementById('inv-modal-name').value = '';
+    document.getElementById('inv-modal-category').value = '';
+    document.getElementById('inv-modal-supplier').value = '';
+    document.getElementById('inv-modal-cost').value = '';
+    document.getElementById('inv-modal-retail').value = '';
+    document.getElementById('inv-modal-rappi').value = '';
+    document.getElementById('inv-modal-stock').value = '0';
+    document.getElementById('inv-modal-adjust').value = '0';
+    document.getElementById('inv-modal-adjust').placeholder = 'Initial stock level';
+
+    modal.classList.remove('hidden');
+    if (prefilledBarcode) {
+      document.getElementById('inv-modal-name').focus();
+    } else {
+      barcodeInput.focus();
+    }
+  },
+
+  // Open modal in edit/adjustment mode
+  async openAdjustmentModal(barcode) {
+    const modal = document.getElementById('inventory-modal');
+    if (!modal) return;
+
+    const product = await db.products.get(barcode);
+    const catalog = await db.master_catalog.get(barcode);
+
+    if (!product) {
+      this.openNewProductModal(barcode);
+      return;
+    }
+
+    document.getElementById('inventory-modal-title').innerText = 'Adjust Product Details';
+    document.getElementById('inventory-modal-icon').className = 'material-icons-outlined modal-icon text-primary';
+
+    const barcodeInput = document.getElementById('inv-modal-barcode');
+    barcodeInput.value = barcode;
+    barcodeInput.setAttribute('readonly', 'true');
+    barcodeInput.style.backgroundColor = 'var(--border-color)';
+    barcodeInput.style.color = 'var(--text-muted)';
+
+    document.getElementById('inv-modal-name').value = catalog ? catalog.product_name : '';
+    document.getElementById('inv-modal-category').value = catalog ? catalog.category : '';
+    document.getElementById('inv-modal-supplier').value = product.supplier || '';
+    document.getElementById('inv-modal-cost').value = product.cost_price || 0;
+    document.getElementById('inv-modal-retail').value = product.sale_price || 0;
+    document.getElementById('inv-modal-rappi').value = product.rappi_price || 0;
+    document.getElementById('inv-modal-stock').value = product.stock || 0;
+    document.getElementById('inv-modal-adjust').value = '0';
+    document.getElementById('inv-modal-adjust').placeholder = 'e.g. 10 or -5';
+
+    modal.classList.remove('hidden');
+    document.getElementById('inv-modal-adjust').focus();
+  },
+
+  closeInventoryModal() {
+    const modal = document.getElementById('inventory-modal');
+    if (modal) modal.classList.add('hidden');
+  },
+
+  // Form submission: save to Dexie and sync to Postgres
+  async saveAdjustment(event) {
+    event.preventDefault();
+
+    const barcode = document.getElementById('inv-modal-barcode').value.trim();
+    const name = document.getElementById('inv-modal-name').value.trim();
+    const category = document.getElementById('inv-modal-category').value.trim();
+    const supplier = document.getElementById('inv-modal-supplier').value.trim() || 'Unknown';
+    
+    const costPrice = parseFloat(document.getElementById('inv-modal-cost').value) || 0;
+    const salePrice = parseFloat(document.getElementById('inv-modal-retail').value) || 0;
+    const rappiPrice = parseFloat(document.getElementById('inv-modal-rappi').value) || salePrice;
+    
+    const currentStock = parseInt(document.getElementById('inv-modal-stock').value) || 0;
+    const adjustQty = parseInt(document.getElementById('inv-modal-adjust').value) || 0;
+    
+    const isNew = !document.getElementById('inv-modal-barcode').hasAttribute('readonly');
+    const finalStock = Math.max(0, isNew ? adjustQty : (currentStock + adjustQty));
+
+    const catalogRecord = {
+      barcode,
+      product_name: name,
+      category
+    };
+
+    const productRecord = {
+      barcode,
+      supplier,
+      cost_price: costPrice,
+      sale_price: salePrice,
+      rappi_price: rappiPrice,
+      stock: finalStock,
+      updated_at: new Date().toISOString()
+    };
+
+    try {
+      // 1. Save locally to Dexie (transactional)
+      await db.transaction('rw', db.master_catalog, db.products, async () => {
+        await db.master_catalog.put(catalogRecord);
+        await db.products.put(productRecord);
+      });
+
+      console.log(`[Inventory] Manually saved barcode: ${barcode} in Dexie.`);
+
+      // 2. Post to server PostgreSQL database (optional sync now, otherwise background sync handles it)
+      if (SyncEngine.onlineStatus) {
+        try {
+          await api.importCatalogBulk([catalogRecord]);
+          await api.importProductsBulk([productRecord]);
+          console.log(`[Inventory] Successfully pushed updates for barcode: ${barcode} to PostgreSQL server.`);
+        } catch (serverErr) {
+          console.warn('[Inventory] Direct server sync failed, relying on background queue:', serverErr);
+        }
+      }
+
+      POS.showToast('Product saved successfully!', 'success');
+      this.closeInventoryModal();
+      
+      // 3. Refresh Inventory Table View
+      await this.loadInventory();
+
+    } catch (err) {
+      console.error('[Inventory] Failed to save product:', err);
+      POS.showToast('Failed to save product: ' + err.message, 'error');
+    }
   }
 };
 

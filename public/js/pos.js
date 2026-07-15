@@ -13,6 +13,7 @@ const POS = {
   init() {
     this.setupListeners();
     this.renderCart();
+    this.setupSearchLookup();
   },
 
   setupListeners() {
@@ -263,9 +264,9 @@ const POS = {
         console.log(`[POS] Sale saved locally with local_id ${localId} ✓`);
       });
 
-      // 2. Play checkout success sound & notify user
+      // 2. Play checkout success sound & notify user with receipt option
       this.playBeep(true);
-      this.showToast('Sale registered successfully!', 'success');
+      this.showCheckoutSuccessToast(saleRecord, localId);
 
       // 3. Clear cart & inputs
       this.cart = [];
@@ -334,5 +335,280 @@ const POS = {
       // Audio context might be blocked by browser autoplay policies
       console.log('Audio feedback skipped');
     }
+  },
+
+  // Search autocomplete lookup by name
+  async setupSearchLookup() {
+    const searchInput = document.getElementById('pos-search-input');
+    const dropdown = document.getElementById('pos-search-dropdown');
+    if (!searchInput || !dropdown) return;
+
+    searchInput.addEventListener('input', async () => {
+      const query = searchInput.value.trim().toLowerCase();
+      if (query.length < 2) {
+        dropdown.innerHTML = '';
+        dropdown.classList.add('hidden');
+        return;
+      }
+
+      // Query local Dexie catalog
+      const catalogMatches = await db.master_catalog
+        .filter(item => item.product_name.toLowerCase().includes(query))
+        .limit(10)
+        .toArray();
+
+      if (catalogMatches.length === 0) {
+        dropdown.innerHTML = '<div class="search-item" style="cursor: default; color: var(--text-muted);">No products found</div>';
+        dropdown.classList.remove('hidden');
+        return;
+      }
+
+      let html = '';
+      for (const match of catalogMatches) {
+        // Fetch price and stock from products table
+        const product = await db.products.get(match.barcode);
+        
+        const price = product ? this.getChannelPrice(product) : 0;
+        const stock = product ? (product.stock || 0) : 0;
+
+        html += `
+          <div class="search-item" data-barcode="${match.barcode}">
+            <div class="item-name">${match.product_name}</div>
+            <div class="item-meta">
+              <span>Barcode: ${match.barcode}</span>
+              <span>Stock: ${stock} | Price: $${price.toFixed(2)}</span>
+            </div>
+          </div>
+        `;
+      }
+
+      dropdown.innerHTML = html;
+      dropdown.classList.remove('hidden');
+
+      // Bind click handlers to search items
+      dropdown.querySelectorAll('.search-item').forEach(el => {
+        el.addEventListener('click', async () => {
+          const barcode = el.getAttribute('data-barcode');
+          if (barcode) {
+            await this.scanProduct(barcode);
+            searchInput.value = '';
+            dropdown.classList.add('hidden');
+            searchInput.focus();
+          }
+        });
+      });
+    });
+
+    // Hide dropdown when clicking outside
+    document.addEventListener('click', (e) => {
+      if (!searchInput.contains(e.target) && !dropdown.contains(e.target)) {
+        dropdown.classList.add('hidden');
+      }
+    });
+  },
+
+  // Dynamic success toast with Print Receipt button
+  showCheckoutSuccessToast(saleRecord, localId) {
+    const container = document.getElementById('toast-container');
+    if (!container) return;
+
+    const toast = document.createElement('div');
+    toast.className = 'toast success';
+    toast.style.width = '350px';
+    toast.style.flexDirection = 'column';
+    toast.style.alignItems = 'stretch';
+    toast.style.gap = '10px';
+    
+    const printRecord = { ...saleRecord, local_id: localId };
+
+    toast.innerHTML = `
+      <div style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
+        <span class="toast-message" style="font-weight: 600;">Sale registered successfully!</span>
+        <span class="material-icons-outlined" style="cursor: pointer; font-size: 18px;" onclick="this.closest('.toast').remove()">close</span>
+      </div>
+      <div style="display: flex; gap: 8px; justify-content: flex-end; margin-top: 4px;">
+        <button id="toast-print-btn" class="btn-primary" style="padding: 6px 12px; font-size: 12px; height: auto; border-radius: 4px; display: flex; align-items: center; gap: 6px; cursor: pointer; width: auto; background-color: var(--color-success); border: none;">
+          <span class="material-icons-outlined" style="font-size: 14px;">print</span>
+          <span>Print Receipt</span>
+        </button>
+      </div>
+    `;
+    
+    container.appendChild(toast);
+    
+    toast.querySelector('#toast-print-btn').addEventListener('click', () => {
+      this.printReceipt(printRecord);
+    });
+
+    // Auto-remove after 8s
+    setTimeout(() => {
+      if (toast.parentNode) {
+        toast.classList.add('fade-out');
+        setTimeout(() => toast.remove(), 300);
+      }
+    }, 8000);
+  },
+
+  // 80mm thermal receipt generator via hidden iframe
+  printReceipt(sale) {
+    let iframe = document.getElementById('print-iframe');
+    if (!iframe) {
+      iframe = document.createElement('iframe');
+      iframe.id = 'print-iframe';
+      iframe.style.position = 'fixed';
+      iframe.style.right = '0';
+      iframe.style.bottom = '0';
+      iframe.style.width = '0';
+      iframe.style.height = '0';
+      iframe.style.border = 'none';
+      document.body.appendChild(iframe);
+    }
+
+    const doc = iframe.contentWindow.document;
+    doc.open();
+
+    const itemsHtml = sale.items.map(item => {
+      const lineTotal = item.unit_price * item.quantity;
+      return `
+        <tr>
+          <td style="padding: 4px 0; vertical-align: top;">${item.product_name}<br/><span style="font-size: 10px; color: #555;">${item.barcode}</span></td>
+          <td style="padding: 4px 0; text-align: center; vertical-align: top;">${item.quantity}</td>
+          <td style="padding: 4px 0; text-align: right; vertical-align: top;">$${item.unit_price.toFixed(2)}</td>
+          <td style="padding: 4px 0; text-align: right; vertical-align: top;">$${lineTotal.toFixed(2)}</td>
+        </tr>
+      `;
+    }).join('');
+
+    const formattedDate = new Date(sale.timestamp).toLocaleString();
+    const deliveryInfo = sale.delivery_apartment 
+      ? `
+        <div style="border-top: 1px dashed #000; padding-top: 6px; margin-top: 6px; font-size: 12px;">
+          <strong>Entrega Domicilio:</strong><br/>
+          Conjunto: ${sale.delivery_complex || 'N/A'}<br/>
+          Torre: ${sale.delivery_tower || 'N/A'} - Apto: ${sale.delivery_apartment}<br/>
+          ${sale.notes ? `Notas: ${sale.notes}` : ''}
+        </div>
+      `
+      : '';
+
+    const htmlContent = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>VelyKaPet Receipt</title>
+        <style>
+          @page {
+            size: auto;
+            margin: 0mm;
+          }
+          body {
+            font-family: 'Courier New', Courier, monospace;
+            width: 80mm;
+            margin: 0;
+            padding: 10px;
+            font-size: 13px;
+            color: #000;
+            line-height: 1.3;
+          }
+          .header {
+            text-align: center;
+            margin-bottom: 12px;
+          }
+          .header h2 {
+            margin: 0 0 4px 0;
+            font-size: 18px;
+            font-weight: bold;
+          }
+          .info-table {
+            width: 100%;
+            font-size: 12px;
+            margin-bottom: 10px;
+          }
+          .items-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 10px;
+          }
+          .items-table th {
+            border-bottom: 1px solid #000;
+            border-top: 1px solid #000;
+            padding: 4px 0;
+            font-size: 11px;
+            text-align: left;
+          }
+          .totals-table {
+            width: 100%;
+            margin-top: 6px;
+            border-top: 1px double #000;
+            padding-top: 6px;
+          }
+          .text-right { text-align: right; }
+          .text-center { text-align: center; }
+          .divider { border-top: 1px dashed #000; margin: 8px 0; }
+        </style>
+      </head>
+      <body>
+        <div class="header">
+          <h2>VELYKAPET</h2>
+          <div style="font-size: 11px;">POS & Inventory System</div>
+          <div style="font-size: 11px;">Consintiendo a tu Mascota</div>
+        </div>
+
+        <table class="info-table">
+          <tr>
+            <td>Fecha:</td>
+            <td class="text-right">${formattedDate}</td>
+          </tr>
+          <tr>
+            <td>Origen:</td>
+            <td class="text-right">${String(sale.origin).toUpperCase()}</td>
+          </tr>
+          <tr>
+            <td>Pago:</td>
+            <td class="text-right">${sale.payment_method}</td>
+          </tr>
+          ${sale.transaction_code ? `<tr><td>Ref:</td><td class="text-right">${sale.transaction_code}</td></tr>` : ''}
+          ${sale.local_id ? `<tr><td>Ticket ID:</td><td class="text-right">#L-${sale.local_id}</td></tr>` : ''}
+        </table>
+
+        <table class="items-table">
+          <thead>
+            <tr>
+              <th style="width: 45%;">Producto</th>
+              <th class="text-center" style="width: 10%;">Cant</th>
+              <th class="text-right" style="width: 20%;">Precio</th>
+              <th class="text-right" style="width: 25%;">Total</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${itemsHtml}
+          </tbody>
+        </table>
+
+        <table class="totals-table">
+          <tr>
+            <td style="font-weight: bold;">TOTAL:</td>
+            <td class="text-right" style="font-weight: bold; font-size: 15px;">$${sale.total_amount.toFixed(2)}</td>
+          </tr>
+        </table>
+
+        ${deliveryInfo}
+
+        <div class="divider"></div>
+        <div class="text-center" style="font-size: 11px; margin-top: 10px;">
+          ¡Gracias por tu compra!<br/>
+          VelyKaPet - Consintiendo a tu mascota
+        </div>
+      </body>
+      </html>
+    `;
+
+    doc.write(htmlContent);
+    doc.close();
+
+    setTimeout(() => {
+      iframe.contentWindow.focus();
+      iframe.contentWindow.print();
+    }, 250);
   }
 };
