@@ -308,7 +308,7 @@ const App = {
     if (!sales || sales.length === 0) {
       tbody.innerHTML = `
         <tr>
-          <td colspan="7" class="text-center">No sales registered yet.</td>
+          <td colspan="8" class="text-center">No sales registered yet.</td>
         </tr>
       `;
       return;
@@ -322,6 +322,9 @@ const App = {
       const itemsCount = s.item_count !== undefined ? s.item_count : (s.items ? s.items.length : 0);
       const total = Number(s.total_amount) || 0;
       const apt = s.delivery_apartment ? `${s.delivery_complex || ''} Apto ${s.delivery_apartment}` : 'N/A';
+      
+      const serverId = s.id || 'null';
+      const localId = s.local_id || 'null';
 
       html += `
         <tr>
@@ -332,10 +335,64 @@ const App = {
           <td class="text-right font-medium">$${total.toFixed(2)}</td>
           <td>${apt}</td>
           <td><span class="report-notes">${s.notes || ''}</span></td>
+          <td class="text-center">
+            <button class="btn-icon delete" onclick="App.deleteSale(${serverId}, ${localId})">
+              <span class="material-icons-outlined">delete_outline</span>
+            </button>
+          </td>
         </tr>
       `;
     });
     tbody.innerHTML = html;
+  },
+
+  // Void / delete a completed sale
+  async deleteSale(serverId, localId) {
+    if (!confirm('Are you absolutely sure you want to void this sale? This will permanently delete the transaction and return the items back to inventory stock.')) {
+      return;
+    }
+
+    try {
+      // 1. If online and has a server ID, delete from PostgreSQL database first
+      if (SyncEngine.onlineStatus && serverId) {
+        const res = await fetch(`/api/sales/${serverId}`, { method: 'DELETE' });
+        if (!res.ok) {
+          const err = await res.json();
+          throw new Error(err.error || 'Failed to delete sale from server');
+        }
+      }
+
+      // 2. Fetch the sale details from local Dexie to know what to restock
+      if (localId) {
+        const sale = await db.sales.get(localId);
+        if (sale) {
+          await db.transaction('rw', db.sales, db.products, async () => {
+            // Return items back to local stock
+            if (Array.isArray(sale.items)) {
+              for (const item of sale.items) {
+                const product = await db.products.get(item.barcode);
+                if (product) {
+                  const currentStock = parseInt(product.stock) || 0;
+                  await db.products.update(item.barcode, { stock: currentStock + item.quantity });
+                }
+              }
+            }
+            // Delete from local IndexedDB
+            await db.sales.delete(localId);
+          });
+        }
+      }
+
+      POS.showToast('Sale voided and stock restored!', 'success');
+      
+      // 3. Reload views
+      await this.loadInventory();
+      await this.loadReports();
+
+    } catch (err) {
+      console.error('[App] Failed to delete sale:', err);
+      POS.showToast(err.message, 'error');
+    }
   }
 };
 

@@ -183,4 +183,57 @@ router.get('/report/summary', async (req, res) => {
   }
 });
 
+// ---------------------------------------------------------------
+// DELETE /api/sales/:id
+// Deletes a sale, restructures inventory stock, cascades line items.
+// ---------------------------------------------------------------
+router.delete('/:id', async (req, res) => {
+  const client = await db.connect();
+  try {
+    const { id } = req.params;
+
+    await client.query('BEGIN');
+
+    // 1. Fetch sale items to return quantities to stock
+    const itemsRes = await client.query(
+      'SELECT barcode, quantity FROM sale_items WHERE sale_id = $1',
+      [id]
+    );
+
+    if (itemsRes.rowCount === 0) {
+      const saleHeader = await client.query('SELECT id FROM sales WHERE id = $1', [id]);
+      if (saleHeader.rowCount === 0) {
+        await client.query('ROLLBACK');
+        return res.status(404).json({ error: 'Sale not found' });
+      }
+    }
+
+    // 2. Restock items (add back quantities)
+    for (const item of itemsRes.rows) {
+      const { barcode, quantity } = item;
+      await client.query(
+        `UPDATE products 
+            SET stock      = stock + $1, 
+                updated_at = NOW() 
+          WHERE barcode    = $2`,
+        [quantity, barcode]
+      );
+    }
+
+    // 3. Delete sale header (cascades to sale_items)
+    const deleteRes = await client.query('DELETE FROM sales WHERE id = $1 RETURNING local_id', [id]);
+    const localId = deleteRes.rows[0]?.local_id || null;
+
+    await client.query('COMMIT');
+    res.json({ message: 'Sale voided successfully', voided_id: id, local_id: localId });
+  } catch (err) {
+    await client.query('ROLLBACK');
+    console.error('[sales] DELETE /:id', err);
+    res.status(500).json({ error: 'Failed to delete/void sale' });
+  } finally {
+    client.release();
+  }
+});
+
 module.exports = router;
+
