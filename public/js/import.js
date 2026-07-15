@@ -52,10 +52,17 @@ const ExcelImporter = {
 
     schemaKeys.forEach(key => {
       const aliases = this.mappings[type][key];
-      // Find the index of the first header that matches one of the aliases
-      const foundIdx = lowerHeaders.findIndex(header => 
-        aliases.some(alias => header === alias || header.includes(alias))
+      // 1. Try exact matches first to prevent collisions (e.g. Proveedor vs Código proveedores)
+      let foundIdx = lowerHeaders.findIndex(header => 
+        aliases.some(alias => header === alias)
       );
+      // 2. Fall back to partial matches if no exact match is found
+      if (foundIdx === -1) {
+        foundIdx = lowerHeaders.findIndex(header => 
+          aliases.some(alias => header.includes(alias))
+        );
+      }
+      
       if (foundIdx !== -1) {
         map[key] = headers[foundIdx]; // store original header name
       }
