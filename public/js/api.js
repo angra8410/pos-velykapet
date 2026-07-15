@@ -5,6 +5,25 @@
 const API_BASE = '/api';
 
 const api = {
+  // Helper to append Authorization header automatically
+  async fetchWithAuth(url, options = {}) {
+    const token = localStorage.getItem('pos_auth_token');
+    if (!options.headers) options.headers = {};
+    if (token) {
+      options.headers['Authorization'] = `Bearer ${token}`;
+    }
+    const res = await fetch(url, options);
+    if (res.status === 401 && !url.includes('/auth/verify') && !url.includes('/health')) {
+      console.warn('[API] Unauthorized request. Clearing token and forcing login.');
+      localStorage.removeItem('pos_auth_token');
+      if (window.App && typeof window.App.showLogin === 'function') {
+        window.App.showLogin();
+      }
+      throw new Error('Authentication required');
+    }
+    return res;
+  },
+
   // Check backend server health
   async checkHealth() {
     try {
@@ -17,9 +36,22 @@ const api = {
     }
   },
 
+  // Verify POS lock password
+  async verifyPassword(password) {
+    const res = await fetch(`${API_BASE}/auth/verify`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ password })
+    });
+    if (!res.ok) {
+      throw new Error('Invalid password');
+    }
+    return await res.json();
+  },
+
   // Upload bulk catalog entries
   async importCatalogBulk(rows) {
-    const res = await fetch(`${API_BASE}/catalog/bulk`, {
+    const res = await this.fetchWithAuth(`${API_BASE}/catalog/bulk`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ rows })
@@ -33,7 +65,7 @@ const api = {
 
   // Upload bulk products entries
   async importProductsBulk(rows) {
-    const res = await fetch(`${API_BASE}/products/bulk`, {
+    const res = await this.fetchWithAuth(`${API_BASE}/products/bulk`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ rows })
@@ -47,7 +79,7 @@ const api = {
 
   // Sync sales from local DB to server
   async syncSales(salesPayload) {
-    const res = await fetch(`${API_BASE}/sync`, {
+    const res = await this.fetchWithAuth(`${API_BASE}/sync`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ sales: salesPayload })
@@ -61,7 +93,7 @@ const api = {
 
   // Get status of latest sync from server
   async getSyncStatus() {
-    const res = await fetch(`${API_BASE}/sync/status`);
+    const res = await this.fetchWithAuth(`${API_BASE}/sync/status`);
     if (!res.ok) throw new Error('Failed to get sync status');
     return await res.json();
   }

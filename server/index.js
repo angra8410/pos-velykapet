@@ -29,6 +29,45 @@ app.get('/api/health', (req, res) => {
 });
 
 // ---------------------------------------------------------------
+// Password Authentication Verification & Middleware
+// ---------------------------------------------------------------
+const POS_PASSWORD = process.env.POS_PASSWORD || 'velykapet';
+
+// Verification endpoint
+app.post('/api/auth/verify', (req, res) => {
+  const { password } = req.body;
+  if (password === POS_PASSWORD) {
+    const token = Buffer.from(POS_PASSWORD).toString('base64');
+    res.json({ success: true, token });
+  } else {
+    res.status(401).json({ error: 'Invalid password' });
+  }
+});
+
+// Middleware to secure all API endpoints (except health and verify)
+const authMiddleware = (req, res, next) => {
+  if (req.path === '/api/health' || req.path === '/api/auth/verify') {
+    return next();
+  }
+
+  const authHeader = req.headers['authorization'];
+  if (!authHeader) {
+    return res.status(401).json({ error: 'Authentication required' });
+  }
+
+  const token = authHeader.split(' ')[1];
+  const expectedToken = Buffer.from(POS_PASSWORD).toString('base64');
+
+  if (token === expectedToken) {
+    next();
+  } else {
+    res.status(401).json({ error: 'Invalid authentication token' });
+  }
+};
+
+app.use('/api', authMiddleware);
+
+// ---------------------------------------------------------------
 // API Routes
 // ---------------------------------------------------------------
 app.use('/api/catalog',  require('./routes/catalog'));

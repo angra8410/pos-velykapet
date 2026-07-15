@@ -14,6 +14,15 @@ const App = {
     this.setupSearch();
     this.setupInventoryScanner();
     
+    const authenticated = this.checkAuthStatus();
+    if (!authenticated) {
+      return; // Stop initialization, wait for login
+    }
+
+    await this.bootstrapApp();
+  },
+
+  async bootstrapApp() {
     // Bootstrap other modules
     SyncEngine.init();
     POS.init();
@@ -594,6 +603,68 @@ const App = {
     } catch (err) {
       console.error('[Inventory] Failed to save product:', err);
       POS.showToast('Failed to save product: ' + err.message, 'error');
+    }
+  },
+
+  // Auth Check on Startup
+  checkAuthStatus() {
+    const token = localStorage.getItem('pos_auth_token');
+    const modal = document.getElementById('login-modal');
+    if (!token) {
+      if (modal) {
+        modal.classList.remove('hidden');
+        setTimeout(() => document.getElementById('login-password').focus(), 100);
+      }
+      return false;
+    }
+    if (modal) modal.classList.add('hidden');
+    return true;
+  },
+
+  // Shows login screen (triggered on 401 Unauthorized API error)
+  showLogin() {
+    const modal = document.getElementById('login-modal');
+    if (modal) {
+      modal.classList.remove('hidden');
+      document.getElementById('login-password').value = '';
+      setTimeout(() => document.getElementById('login-password').focus(), 100);
+    }
+  },
+
+  // Handle verification form submit
+  async handleLoginSubmit(event) {
+    event.preventDefault();
+    const passwordInput = document.getElementById('login-password');
+    const password = passwordInput.value.trim();
+    if (!password) return;
+
+    try {
+      let token;
+      // If we are online, verify with server. Otherwise, verify with local hash.
+      if (SyncEngine.onlineStatus) {
+        const res = await api.verifyPassword(password);
+        token = res.token;
+        localStorage.setItem('pos_offline_hash', btoa(password));
+      } else {
+        const offlineHash = localStorage.getItem('pos_offline_hash');
+        if (offlineHash && btoa(password) === offlineHash) {
+          token = offlineHash;
+        } else {
+          throw new Error('Invalid password (offline mode)');
+        }
+      }
+
+      localStorage.setItem('pos_auth_token', token);
+      document.getElementById('login-modal').classList.add('hidden');
+      POS.showToast('System unlocked!', 'success');
+      
+      await this.bootstrapApp();
+
+    } catch (err) {
+      console.error('[Auth] Verification failed:', err);
+      POS.showToast('Invalid password. Access denied.', 'error');
+      passwordInput.value = '';
+      passwordInput.focus();
     }
   }
 };
