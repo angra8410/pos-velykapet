@@ -260,7 +260,7 @@ const App = {
       const res = await api.checkHealth();
       if (res) {
         // If server is online, fetch sales logs and metadata
-        const salesRes = await fetch('/api/sales?limit=15');
+        const salesRes = await api.fetchWithAuth('/api/sales?limit=15');
         if (salesRes.ok) {
           const salesData = await salesRes.json();
           this.renderSalesLogTable(salesData.data);
@@ -374,7 +374,7 @@ const App = {
     try {
       // 1. If online and has a server ID, delete from PostgreSQL database first
       if (SyncEngine.onlineStatus && serverId) {
-        const res = await fetch(`/api/sales/${serverId}`, { method: 'DELETE' });
+        const res = await api.fetchWithAuth(`/api/sales/${serverId}`, { method: 'DELETE' });
         if (!res.ok) {
           const err = await res.json();
           throw new Error(err.error || 'Failed to delete sale from server');
