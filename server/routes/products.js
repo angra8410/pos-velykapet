@@ -100,8 +100,16 @@ router.post('/bulk', async (req, res) => {
 
     let upserted = 0;
     for (const row of rows) {
-      const { barcode, supplier, cost_price, sale_price, rappi_price, stock } = row;
+      const { barcode, supplier, cost_price, sale_price, rappi_price, stock, product_name, category } = row;
       if (!barcode) continue;
+
+      // Ensure the barcode exists in master_catalog first to prevent FK violation
+      await client.query(
+        `INSERT INTO master_catalog (barcode, product_name, category)
+              VALUES ($1, $2, $3)
+         ON CONFLICT (barcode) DO NOTHING`,
+        [barcode, product_name || 'Product ' + barcode, category || 'General']
+      );
 
       await client.query(
         `INSERT INTO products (barcode, supplier, cost_price, sale_price, rappi_price, stock, updated_at)

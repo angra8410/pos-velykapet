@@ -19,10 +19,13 @@ const ExcelImporter = {
       cost_price: ['cost_price', 'cost', 'costo', 'precio costo', 'costo_precio'],
       sale_price: ['sale_price', 'price', 'precio', 'retail', 'venta', 'precio venta', 'sale'],
       rappi_price: ['rappi_price', 'rappi', 'precio rappi', 'rappi price'],
-      stock: ['stock', 'cantidad', 'inventario', 'qty', 'quantity', 'existencias']
+      stock: ['stock', 'cantidad', 'inventario', 'qty', 'quantity', 'existencias'],
+      // Extra fields to automatically populate master_catalog from inventory sheet if missing
+      product_name: ['product_name', 'product', 'producto', 'name', 'nombre', 'descripcion', 'description'],
+      category: ['category', 'categoria', 'tipo', 'group', 'grupo']
     }
   },
-
+  
   // Read and parse file
   async parseFile(file) {
     return new Promise((resolve, reject) => {
@@ -80,6 +83,10 @@ const ExcelImporter = {
         item.sale_price = parseFloat(row[mapping.sale_price]) || 0;
         item.rappi_price = parseFloat(row[mapping.rappi_price]) || item.sale_price; // fallback to sale price
         item.stock = parseInt(row[mapping.stock]) || 0;
+        
+        // Map extra product_name and category columns from inventory sheet
+        item.product_name = String(row[mapping.product_name] || '').trim();
+        item.category = String(row[mapping.category] || 'General').trim();
 
         if (!item.barcode) return null;
       }
@@ -117,9 +124,23 @@ const ExcelImporter = {
 
     progressCallback(`Saving ${total} product records locally...`, 10);
     // 1. Bulk save to Dexie
-    await db.transaction('rw', db.products, async () => {
+    await db.transaction('rw', db.products, db.master_catalog, async () => {
+      // Auto-populate missing master_catalog entries from the inventory rows
+      const catalogEntries = rows
+        .filter(r => r.product_name)
+        .map(r => ({
+          barcode: r.barcode,
+          product_name: r.product_name,
+          category: r.category || 'General'
+        }));
+
+      if (catalogEntries.length > 0) {
+        await db.master_catalog.bulkPut(catalogEntries);
+      }
+
       await db.products.bulkPut(rows);
     });
+
 
     progressCallback('Syncing inventory with production database...', 40);
     // 2. Bulk post to server in batches
