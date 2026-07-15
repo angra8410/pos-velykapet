@@ -10,11 +10,13 @@ const pool = new Pool({
     : false,
 });
 
-// Verify connection on startup
+// Verify connection on startup — non-fatal so the healthcheck
+// endpoint can still respond even if DB is momentarily unavailable.
 pool.connect((err, client, release) => {
   if (err) {
-    console.error('[DB] Connection error:', err.message);
-    process.exit(1);
+    console.warn('[DB] Warning: could not connect on startup:', err.message);
+    console.warn('[DB] Make sure DATABASE_URL is set and the Postgres service is linked in Railway.');
+    return; // Don't crash — routes will fail individually if DB is down
   }
   release();
   console.log('[DB] Connected to PostgreSQL ✓');
