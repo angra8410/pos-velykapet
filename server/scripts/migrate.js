@@ -9,10 +9,14 @@ const { Pool } = require('pg');
 const fs = require('fs');
 const path = require('path');
 
+const dbUrl = process.env.DATABASE_URL || '';
+const isRailwayInternal = dbUrl.includes('railway.internal');
+
 const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-  ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false,
+  connectionString: dbUrl,
+  ssl: isRailwayInternal ? false : { rejectUnauthorized: false },
 });
+
 
 async function runMigrations() {
   const migrationsDir = path.join(__dirname, '..', 'migrations');
