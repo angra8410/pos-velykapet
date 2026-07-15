@@ -33,11 +33,36 @@ const dbHelper = {
   },
 
   // Retrieve item details joined with catalog details by barcode
-  async getProductByBarcode(barcode) {
-    const product = await db.products.get(barcode);
+  // Supports robust matching for padded/stripped barcodes (Excel number formatting fixes)
+  async getProductByBarcode(originalBarcode) {
+    const barcode = String(originalBarcode).trim();
+    let product = await db.products.get(barcode);
+    let matchedBarcode = barcode;
+
+    // 1. If not found, try stripping leading zeros (case where Excel lost leading zeros but scanner has them)
+    if (!product && barcode.startsWith('0')) {
+      const stripped = barcode.replace(/^0+/, '');
+      product = await db.products.get(stripped);
+      if (product) matchedBarcode = stripped;
+    }
+
+    // 2. If still not found, try padding to UPC (12 digits) with leading zeros
+    if (!product && barcode.length < 12) {
+      const padded12 = barcode.padStart(12, '0');
+      product = await db.products.get(padded12);
+      if (product) matchedBarcode = padded12;
+    }
+
+    // 3. If still not found, try padding to EAN (13 digits)
+    if (!product && barcode.length < 13) {
+      const padded13 = barcode.padStart(13, '0');
+      product = await db.products.get(padded13);
+      if (product) matchedBarcode = padded13;
+    }
+
     if (!product) return null;
     
-    const catalog = await db.master_catalog.get(barcode);
+    const catalog = await db.master_catalog.get(matchedBarcode);
     return {
       barcode: product.barcode,
       product_name: catalog ? catalog.product_name : 'Unknown Product',
@@ -50,3 +75,4 @@ const dbHelper = {
     };
   }
 };
+

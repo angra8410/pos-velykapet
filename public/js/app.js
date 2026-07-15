@@ -113,7 +113,7 @@ const App = {
 
       // 2. Convert sheet to JSON
       const worksheet = workbook.Sheets[sheetName];
-      const rawJson = XLSX.utils.sheet_to_json(worksheet, { defval: '' });
+      const rawJson = XLSX.utils.sheet_to_json(worksheet, { defval: '', raw: false });
 
       if (rawJson.length === 0) {
         throw new Error(`Sheet "${sheetName}" is empty!`);
