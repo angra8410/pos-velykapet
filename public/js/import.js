@@ -23,6 +23,13 @@ const ExcelImporter = {
       // Extra fields to automatically populate master_catalog from inventory sheet if missing
       product_name: ['nombre producto', 'product_name', 'product', 'producto', 'name', 'nombre', 'descripción', 'descripcion', 'description'],
       category: ['categoría', 'categoria', 'category', 'tipo', 'group', 'grupo']
+    },
+    expenses: {
+      timestamp: ['fecha', 'date', 'timestamp', 'dia'],
+      description: ['descripción', 'descripcion', 'description', 'detalle', 'concepto'],
+      category: ['categoría gasto', 'categoria gasto', 'categoría', 'categoria', 'category', 'tipo'],
+      payment_method: ['método pago', 'metodo pago', 'pago', 'payment_method', 'metodo_pago'],
+      amount: ['monto', 'valor', 'total', 'precio', 'amount', 'costo']
     }
   },
   
@@ -89,6 +96,42 @@ const ExcelImporter = {
 
   // Transform raw sheet JSON data based on detected mapping
   transformData(rawJson, mapping, type) {
+    if (type === 'expenses') {
+      const expensesList = [];
+      rawJson.forEach(row => {
+        const timestamp = row[mapping.timestamp];
+        const description = row[mapping.description];
+        const category = row[mapping.category];
+        const payment_method = row[mapping.payment_method];
+        const amount = row[mapping.amount];
+        const notes = row['Notas'] || '';
+
+        if (timestamp && description && amount != null) {
+          expensesList.push({
+            timestamp: new Date(timestamp).toISOString(),
+            description: String(description).trim(),
+            category: String(category || 'General').trim(),
+            payment_method: String(payment_method || 'Other').trim(),
+            amount: this.parseNumber(amount),
+            notes: String(notes).trim()
+          });
+        }
+
+        // Parse side-by-side secondary entry if it exists (repetition in GASTOS sheet)
+        if (row['__EMPTY_3'] && row['__EMPTY_4'] && row['__EMPTY_7']) {
+          expensesList.push({
+            timestamp: new Date(row['__EMPTY_3']).toISOString(),
+            description: String(row['__EMPTY_4']).trim(),
+            category: String(row['__EMPTY_5'] || 'General').trim(),
+            payment_method: String(row['__EMPTY_6'] || 'Other').trim(),
+            amount: this.parseNumber(row['__EMPTY_7']),
+            notes: String(row['__EMPTY_8'] || '').trim()
+          });
+        }
+      });
+      return expensesList;
+    }
+
     return rawJson.map(row => {
       const item = {};
       
@@ -175,5 +218,30 @@ const ExcelImporter = {
     }
 
     progressCallback('Inventory imported successfully ✓', 100);
+  },
+
+  // Import expenses rows (first Dexie, then PostgreSQL)
+  async importExpenses(rows, progressCallback) {
+    const batchSize = 250;
+    const total = rows.length;
+
+    progressCallback(`Saving ${total} expenses locally...`, 10);
+    // 1. Bulk save to Dexie
+    await db.transaction('rw', db.expenses, async () => {
+      const synced = (window.SyncEngine && SyncEngine.onlineStatus) ? 1 : 0;
+      const dbRows = rows.map(r => ({ ...r, synced }));
+      await db.expenses.bulkPut(dbRows);
+    });
+
+    progressCallback('Syncing expenses with production database...', 40);
+    // 2. Bulk post to server in batches
+    for (let i = 0; i < total; i += batchSize) {
+      const batch = rows.slice(i, i + batchSize);
+      const pct = Math.floor(40 + (i / total) * 50);
+      progressCallback(`Syncing expenses batch ${i / batchSize + 1}...`, pct);
+      await api.importExpensesBulk(batch);
+    }
+
+    progressCallback('Expenses imported successfully ✓', 100);
   }
 };
