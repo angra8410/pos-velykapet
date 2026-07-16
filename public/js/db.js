@@ -20,14 +20,22 @@ db.version(1).stores({
   sales: '++local_id, timestamp, synced, origin, payment_method'
 });
 
+db.version(2).stores({
+  master_catalog: '&barcode, category',
+  products: '&barcode, supplier',
+  sales: '++local_id, timestamp, synced, origin, payment_method',
+  expenses: '++local_id, timestamp, synced, category'
+});
+
 // Helper functions for common Dexie operations
 const dbHelper = {
   // Clear all local tables (useful for complete refresh / reset)
   async clearAll() {
-    await db.transaction('rw', db.master_catalog, db.products, db.sales, async () => {
+    await db.transaction('rw', db.master_catalog, db.products, db.sales, db.expenses, async () => {
       await db.master_catalog.clear();
       await db.products.clear();
       await db.sales.clear();
+      await db.expenses.clear();
     });
     console.log('[Dexie] Local database cleared.');
   },

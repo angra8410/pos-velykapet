@@ -325,6 +325,19 @@
               </div>
             </div>
 
+            <!-- Card 3: Expenses Upload -->
+            <div class="card drop-card">
+              <div class="card-icon" style="background-color: rgba(239, 68, 68, 0.1); color: var(--color-danger);">
+                <span class="material-icons-outlined">payments</span>
+              </div>
+              <div class="drop-info">
+                <h3>3. Expenses Log Spreadsheet</h3>
+                <p>Drop the spreadsheet or click to select file. Mapped from sheet <em>'GASTOS'</em></p>
+                <input type="file" id="file-expenses-input" accept=".xlsx, .xls, .csv" class="hidden-file-input">
+                <button class="btn-secondary" onclick="document.getElementById('file-expenses-input').click()">Select File</button>
+              </div>
+            </div>
+
             <!-- Import Progress Indicator -->
             <div id="import-progress-card" class="card progress-card hidden">
               <h3 id="progress-title">Importing Data...</h3>
@@ -412,6 +425,44 @@
                 <tbody id="report-sales-tbody">
                   <tr>
                     <td colspan="8" class="text-center">Loading sales list from server...</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- Expenses Log Table -->
+          <div class="card sales-log-card col-span-2" style="margin-top: 20px;">
+            <div class="panel-header">
+              <h2>Recent Expenses Log (Railway Postgres)</h2>
+              <div style="display: flex; gap: 10px;">
+                <button class="btn-checkout" onclick="App.openExpenseModal()" style="margin-top: 0; width: auto; font-size: 13px; padding: 0 14px; background-color: var(--color-success); border: none;">
+                  <span class="material-icons-outlined" style="font-size: 18px; margin-right: 4px;">add_card</span>
+                  <span>Add Expense</span>
+                </button>
+                <button class="btn-secondary" onclick="App.loadReports()">
+                  <span class="material-icons-outlined">refresh</span>
+                  <span>Refresh Log</span>
+                </button>
+              </div>
+            </div>
+            
+            <div class="table-container">
+              <table class="report-table">
+                <thead>
+                  <tr>
+                    <th>Date</th>
+                    <th>Description</th>
+                    <th>Category</th>
+                    <th>Payment Method</th>
+                    <th class="text-right">Amount</th>
+                    <th>Notes</th>
+                    <th class="text-center">Action</th>
+                  </tr>
+                </thead>
+                <tbody id="report-expenses-tbody">
+                  <tr>
+                    <td colspan="7" class="text-center">Loading expenses list from server...</td>
                   </tr>
                 </tbody>
               </table>
@@ -523,16 +574,71 @@
     </div>
   </div>
 
+  <!-- Custom Expense Modal -->
+  <div id="expense-modal" class="modal-overlay hidden">
+    <div class="modal-card" style="width: 480px; max-width: 95%;">
+      <div class="modal-header">
+        <span class="material-icons-outlined modal-icon text-success">payments</span>
+        <h3>Record New Expense</h3>
+      </div>
+      <form id="expense-form" onsubmit="App.handleExpenseSubmit(event)">
+        <div class="modal-body">
+          <div class="form-row" style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+            <div class="form-group">
+              <label for="expense-date" style="font-weight: 500; font-size: 13px; color: var(--text-main); margin-bottom: 6px; display: block;">Date & Time *</label>
+              <input type="datetime-local" id="expense-date" required style="width: 100%; box-sizing: border-box; background: var(--bg-card); border: 1px solid var(--border-color); border-radius: var(--radius-sm); padding: 10px; color: var(--text-main);">
+            </div>
+            <div class="form-group">
+              <label for="expense-amount" style="font-weight: 500; font-size: 13px; color: var(--text-main); margin-bottom: 6px; display: block;">Amount ($ COP) *</label>
+              <input type="number" id="expense-amount" min="1" step="0.01" required placeholder="e.g. 50000" style="width: 100%; box-sizing: border-box; background: var(--bg-card); border: 1px solid var(--border-color); border-radius: var(--radius-sm); padding: 10px; color: var(--text-main);">
+            </div>
+          </div>
+          
+          <div class="form-group" style="margin-top: 12px;">
+            <label for="expense-description" style="font-weight: 500; font-size: 13px; color: var(--text-main); margin-bottom: 6px; display: block;">Description *</label>
+            <input type="text" id="expense-description" required placeholder="e.g. Paper rolls, rent, supplier payment..." style="width: 100%; box-sizing: border-box; background: var(--bg-card); border: 1px solid var(--border-color); border-radius: var(--radius-sm); padding: 10px; color: var(--text-main);">
+          </div>
+
+          <div class="form-row" style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 12px;">
+            <div class="form-group">
+              <label for="expense-category" style="font-weight: 500; font-size: 13px; color: var(--text-main); margin-bottom: 6px; display: block;">Category *</label>
+              <input type="text" id="expense-category" required placeholder="e.g. Rent, Utilities, Supplies, Food..." style="width: 100%; box-sizing: border-box; background: var(--bg-card); border: 1px solid var(--border-color); border-radius: var(--radius-sm); padding: 10px; color: var(--text-main);">
+            </div>
+            <div class="form-group">
+              <label for="expense-payment" style="font-weight: 500; font-size: 13px; color: var(--text-main); margin-bottom: 6px; display: block;">Payment Method *</label>
+              <select id="expense-payment" required style="width: 100%; box-sizing: border-box; background: var(--bg-card); border: 1px solid var(--border-color); border-radius: var(--radius-sm); padding: 10px; color: var(--text-main);">
+                <option value="Efectivo">Efectivo</option>
+                <option value="Nequi">Nequi</option>
+                <option value="Bancolombia">Bancolombia</option>
+                <option value="TC">Tarjeta de Crédito</option>
+                <option value="Transferencia">Transferencia</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="form-group" style="margin-top: 12px;">
+            <label for="expense-notes" style="font-weight: 500; font-size: 13px; color: var(--text-main); margin-bottom: 6px; display: block;">Notes (Optional)</label>
+            <textarea id="expense-notes" rows="2" placeholder="Any additional context..." style="width: 100%; box-sizing: border-box; background: var(--bg-card); border: 1px solid var(--border-color); border-radius: var(--radius-sm); padding: 10px; color: var(--text-main); font-family: inherit; resize: vertical;"></textarea>
+          </div>
+        </div>
+        <div class="modal-footer" style="margin-top: 20px; display: flex; justify-content: flex-end; gap: 12px;">
+          <button type="button" class="btn-secondary" onclick="App.closeExpenseModal()">Cancel</button>
+          <button type="submit" class="btn-checkout" style="margin-top: 0; width: auto; background-color: var(--color-success); border: none;">Save Expense</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
   <!-- Toast Notification Container -->
   <div id="toast-container" class="toast-container"></div>
 
   <!-- Main JavaScript Files bootstrapping the application -->
-  <script src="/js/db.js?v=1.0.3"></script>
-  <script src="/js/api.js?v=1.0.3"></script>
-  <script src="/js/sync.js?v=1.0.3"></script>
-  <script src="/js/import.js?v=1.0.3"></script>
-  <script src="/js/pos.js?v=1.0.3"></script>
-  <script src="/js/app.js?v=1.0.3"></script>
+  <script src="/js/db.js?v=1.0.4"></script>
+  <script src="/js/api.js?v=1.0.4"></script>
+  <script src="/js/sync.js?v=1.0.4"></script>
+  <script src="/js/import.js?v=1.0.4"></script>
+  <script src="/js/pos.js?v=1.0.4"></script>
+  <script src="/js/app.js?v=1.0.4"></script>
 
 </body>
 </html>

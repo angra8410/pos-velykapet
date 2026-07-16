@@ -66,6 +66,7 @@ const App = {
   setupImporterUI() {
     const catalogInput = document.getElementById('file-catalog-input');
     const inventoryInput = document.getElementById('file-inventory-input');
+    const expensesInput = document.getElementById('file-expenses-input');
 
     if (catalogInput) {
       catalogInput.addEventListener('change', async (e) => {
@@ -84,9 +85,18 @@ const App = {
         inventoryInput.value = ''; // clear
       });
     }
+
+    if (expensesInput) {
+      expensesInput.addEventListener('change', async (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        await this.handleImport(file, 'expenses');
+        expensesInput.value = ''; // clear
+      });
+    }
   },
 
-  // Core handler for importing catalog/inventory Excel files
+  // Core handler for importing catalog/inventory/expenses Excel files
   async handleImport(file, type) {
     const progressCard = document.getElementById('import-progress-card');
     const progressTitle = document.getElementById('progress-title');
@@ -96,7 +106,7 @@ const App = {
     if (!progressCard) return;
 
     progressCard.classList.remove('hidden');
-    progressTitle.innerText = `Parsing ${type === 'catalog' ? 'Master Catalog' : 'Live Inventory'}...`;
+    progressTitle.innerText = `Parsing ${type === 'catalog' ? 'Master Catalog' : (type === 'inventory' ? 'Live Inventory' : 'Expenses Log')}...`;
     progressBarFill.style.width = '0%';
     progressStatus.innerText = 'Reading file...';
 
@@ -114,8 +124,11 @@ const App = {
       if (type === 'catalog') {
         const found = workbook.SheetNames.find(n => n.toLowerCase().includes('barr'));
         if (found) sheetName = found;
-      } else {
+      } else if (type === 'inventory') {
         const found = workbook.SheetNames.find(n => n.toLowerCase().includes('defin') || n.toLowerCase().includes('stock'));
+        if (found) sheetName = found;
+      } else if (type === 'expenses') {
+        const found = workbook.SheetNames.find(n => n.toLowerCase().includes('gastos'));
         if (found) sheetName = found;
       }
 
@@ -137,12 +150,15 @@ const App = {
       // Detect column maps
       const mapping = ExcelImporter.detectHeaders(headers, type);
       
-      // Ensure we mapped the critical barcode field
-      if (!mapping.barcode) {
+      // Ensure we mapped the critical barcode/amount fields
+      if (type !== 'expenses' && !mapping.barcode) {
         throw new Error(`Failed to map Barcode column. Headers found: ${headers.join(', ')}`);
       }
       if (type === 'catalog' && !mapping.product_name) {
         throw new Error('Failed to map Product Name / Description column.');
+      }
+      if (type === 'expenses' && (!mapping.amount || !mapping.description)) {
+        throw new Error(`Failed to map Description or Amount columns for expenses. Headers found: ${headers.join(', ')}`);
       }
 
       updateProgress('Transforming data...', 35);
@@ -157,8 +173,10 @@ const App = {
       // 3. Save locally & Push to server
       if (type === 'catalog') {
         await ExcelImporter.importCatalog(rows, updateProgress);
-      } else {
+      } else if (type === 'inventory') {
         await ExcelImporter.importProducts(rows, updateProgress);
+      } else if (type === 'expenses') {
+        await ExcelImporter.importExpenses(rows, updateProgress);
       }
 
       POS.showToast('Import completed successfully!', 'success');
@@ -249,6 +267,7 @@ const App = {
   // Load analytics reports and recent sales log
   async loadReports() {
     const tbody = document.getElementById('report-sales-tbody');
+    const expensesTbody = document.getElementById('report-expenses-tbody');
     const kpiRevenue = document.getElementById('report-kpi-revenue');
     const kpiSales = document.getElementById('report-kpi-sales');
     const kpiProfit = document.getElementById('report-kpi-profit');
@@ -266,6 +285,16 @@ const App = {
           this.renderSalesLogTable(salesData.data);
         }
 
+        // Fetch recent expenses log from server
+        try {
+          const expensesData = await api.getExpenses(15);
+          if (expensesData && expensesData.data) {
+            this.renderExpensesLogTable(expensesData.data);
+          }
+        } catch (expErr) {
+          console.warn('[App] Failed to load expenses from server:', expErr);
+        }
+
         // Fetch sync status
         const syncStatus = await api.getSyncStatus();
         if (syncStatus && syncStatus.data) {
@@ -277,6 +306,10 @@ const App = {
         // Fallback to local Dexie logs if offline
         const localSales = await db.sales.orderBy('timestamp').reverse().limit(15).toArray();
         this.renderSalesLogTable(localSales);
+
+        const localExpenses = await db.expenses.orderBy('timestamp').reverse().limit(15).toArray();
+        this.renderExpensesLogTable(localExpenses);
+
         serverSalesCount.innerText = 'Offline';
         lastSyncTime.innerText = 'Offline';
       }
@@ -310,7 +343,7 @@ const App = {
     } catch (err) {
       console.error('[App] Failed to load reports:', err);
       if (tbody) {
-        tbody.innerHTML = `<tr><td colspan="7" class="text-center text-danger">Failed to load reports: ${err.message}</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="8" class="text-center text-danger">Failed to load reports: ${err.message}</td></tr>`;
       }
     }
   },
@@ -665,6 +698,155 @@ const App = {
       POS.showToast('Invalid password. Access denied.', 'error');
       passwordInput.value = '';
       passwordInput.focus();
+    }
+  },
+
+  // Open manual expense creation modal
+  openExpenseModal() {
+    const modal = document.getElementById('expense-modal');
+    if (!modal) return;
+    
+    // Reset form fields
+    document.getElementById('expense-form').reset();
+    
+    // Set date field to local current time
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = String(now.getMonth() + 1).padStart(2, '0');
+    const day = String(now.getDate()).padStart(2, '0');
+    const hours = String(now.getHours()).padStart(2, '0');
+    const minutes = String(now.getMinutes()).padStart(2, '0');
+    document.getElementById('expense-date').value = `${year}-${month}-${day}T${hours}:${minutes}`;
+
+    modal.classList.remove('hidden');
+  },
+
+  // Close manual expense modal
+  closeExpenseModal() {
+    const modal = document.getElementById('expense-modal');
+    if (modal) modal.classList.add('hidden');
+  },
+
+  // Handle manual expense form submission
+  async handleExpenseSubmit(event) {
+    event.preventDefault();
+    const dateVal = document.getElementById('expense-date').value;
+    const amountVal = document.getElementById('expense-amount').value;
+    const descriptionVal = document.getElementById('expense-description').value.trim();
+    const categoryVal = document.getElementById('expense-category').value.trim();
+    const paymentVal = document.getElementById('expense-payment').value;
+    const notesVal = document.getElementById('expense-notes').value.trim();
+
+    if (!dateVal || !amountVal || !descriptionVal || !categoryVal) {
+      POS.showToast('Please fill out all required fields.', 'error');
+      return;
+    }
+
+    const expenseRecord = {
+      timestamp: new Date(dateVal).toISOString(),
+      amount: parseFloat(amountVal),
+      description: descriptionVal,
+      category: categoryVal,
+      payment_method: paymentVal,
+      notes: notesVal || null
+    };
+
+    try {
+      // 1. Save locally to Dexie (marked as unsynced first)
+      let localId;
+      await db.transaction('rw', db.expenses, async () => {
+        localId = await db.expenses.add({ ...expenseRecord, synced: 0 });
+      });
+
+      console.log(`[Expense] Saved locally with localId: ${localId}`);
+
+      // 2. If online, attempt to push directly to PostgreSQL
+      if (SyncEngine.onlineStatus) {
+        try {
+          await api.addExpense(expenseRecord);
+          // Mark as synced locally
+          await db.expenses.update(localId, { synced: 1 });
+          console.log(`[Expense] Pushed and synced localId: ${localId} to server.`);
+        } catch (serverErr) {
+          console.warn('[Expense] Failed to push directly to server, will sync in background:', serverErr);
+        }
+      }
+
+      POS.showToast('Expense recorded successfully!', 'success');
+      this.closeExpenseModal();
+
+      // 3. Reload reports view
+      await this.loadReports();
+
+    } catch (err) {
+      console.error('[Expense] Failed to save expense:', err);
+      POS.showToast('Failed to save expense: ' + err.message, 'error');
+    }
+  },
+
+  // Render recent expenses log
+  renderExpensesLogTable(expenses) {
+    const tbody = document.getElementById('report-expenses-tbody');
+    if (!tbody) return;
+
+    if (!expenses || expenses.length === 0) {
+      tbody.innerHTML = `<tr><td colspan="7" class="text-center text-muted">No expenses recorded yet.</td></tr>`;
+      return;
+    }
+
+    tbody.innerHTML = expenses.map(exp => {
+      const dateStr = new Date(exp.timestamp).toLocaleString();
+      const amountStr = Number(exp.amount).toLocaleString('en-US', { style: 'currency', currency: 'USD' });
+      const idVal = exp.id || `local_${exp.local_id}`;
+
+      return `
+        <tr>
+          <td>${dateStr}</td>
+          <td>${exp.description}</td>
+          <td><span class="badge badge-normal">${exp.category}</span></td>
+          <td>${exp.payment_method}</td>
+          <td class="text-right text-danger font-semibold">-${amountStr}</td>
+          <td class="text-muted" style="max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+            ${exp.notes || ''}
+          </td>
+          <td class="text-center">
+            <button class="btn-void" onclick="App.deleteExpenseTrigger('${idVal}', ${exp.local_id || 'null'})" title="Delete Expense">
+              <span class="material-icons-outlined">delete</span>
+            </button>
+          </td>
+        </tr>
+      `;
+    }).join('');
+  },
+
+  // Trigger voiding/deleting an expense entry
+  async deleteExpenseTrigger(idVal, localId) {
+    const confirmed = await this.showConfirm('Are you absolutely sure you want to delete this expense entry? This action is permanent.');
+    if (!confirmed) return;
+
+    try {
+      // 1. If it has a database ID (numeric), delete from PostgreSQL
+      if (SyncEngine.onlineStatus && !String(idVal).startsWith('local_')) {
+        await api.deleteExpense(idVal);
+        console.log(`[Expense] Deleted expense ID ${idVal} from server.`);
+      }
+
+      // 2. Delete locally from Dexie
+      if (localId) {
+        await db.expenses.delete(localId);
+      } else if (String(idVal).startsWith('local_')) {
+        const parsedLocalId = parseInt(idVal.split('_')[1]);
+        if (!isNaN(parsedLocalId)) {
+          await db.expenses.delete(parsedLocalId);
+        }
+      }
+
+      POS.showToast('Expense entry deleted successfully.', 'success');
+      await this.loadReports();
+
+    } catch (err) {
+      console.error('[Expense] Failed to delete expense:', err);
+      POS.showToast('Failed to delete expense: ' + err.message, 'error');
     }
   }
 };

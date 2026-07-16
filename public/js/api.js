@@ -96,5 +96,52 @@ const api = {
     const res = await this.fetchWithAuth(`${API_BASE}/sync/status`);
     if (!res.ok) throw new Error('Failed to get sync status');
     return await res.json();
+  },
+
+  // Upload bulk expenses entries
+  async importExpensesBulk(rows) {
+    const res = await this.fetchWithAuth(`${API_BASE}/expenses/bulk`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ rows })
+    });
+    if (!res.ok) {
+      const err = await res.json();
+      throw new Error(err.error || 'Bulk expenses import failed');
+    }
+    return await res.json();
+  },
+
+  // Get recent expenses list from server
+  async getExpenses(limit = 100) {
+    const res = await this.fetchWithAuth(`${API_BASE}/expenses?limit=${limit}`);
+    if (!res.ok) throw new Error('Failed to get expenses list');
+    return await res.json();
+  },
+
+  // Add single expense entry
+  async addExpense(expensePayload) {
+    const res = await this.fetchWithAuth(`${API_BASE}/expenses`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(expensePayload)
+    });
+    if (!res.ok) {
+      const err = await res.json();
+      throw new Error(err.error || 'Failed to add expense entry');
+    }
+    return await res.json();
+  },
+
+  // Delete a specific expense entry
+  async deleteExpense(id) {
+    const res = await this.fetchWithAuth(`${API_BASE}/expenses/${id}`, {
+      method: 'DELETE'
+    });
+    if (!res.ok) {
+      const err = await res.json();
+      throw new Error(err.error || 'Failed to delete expense entry');
+    }
+    return await res.json();
   }
 };

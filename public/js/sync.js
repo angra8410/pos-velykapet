@@ -38,39 +38,49 @@ const SyncEngine = {
     }
   },
 
-  // Perform bulk sync of unsynced transactions
+  // Perform bulk sync of unsynced transactions and expenses
   async runSync() {
     if (this.isSyncing) return;
     this.isSyncing = true;
     this.updateUIStatus();
 
     try {
-      // Find all sales marked as unsynced
+      // 1. Sync Sales
       const unsyncedSales = await db.sales.where('synced').equals(0).toArray();
-      
-      if (unsyncedSales.length === 0) {
-        console.log('[Sync] Database is fully synchronized ✓');
-        this.isSyncing = false;
-        this.updateUIStatus();
-        return;
+      if (unsyncedSales.length > 0) {
+        console.log(`[Sync] Pushing ${unsyncedSales.length} transaction(s) to server...`);
+        const result = await api.syncSales(unsyncedSales);
+        
+        // Update local IndexedDB records to synced = 1 based on API response
+        if (result && result.results) {
+          await db.transaction('rw', db.sales, async () => {
+            for (const item of result.results) {
+              if (item.status === 'synced' || item.status === 'skipped') {
+                await db.sales.update(item.local_id, { synced: 1 });
+              }
+            }
+          });
+          console.log(`[Sync] Successfully synchronized ${unsyncedSales.length} transaction(s) ✓`);
+        }
       }
 
-      console.log(`[Sync] Pushing ${unsyncedSales.length} transaction(s) to server...`);
-      
-      // Call sync endpoint
-      const result = await api.syncSales(unsyncedSales);
-      
-      // Update local IndexedDB records to synced = 1 based on API response
-      if (result && result.results) {
-        await db.transaction('rw', db.sales, async () => {
-          for (const item of result.results) {
-            if (item.status === 'synced' || item.status === 'skipped') {
-              await db.sales.update(item.local_id, { synced: 1 });
+      // 2. Sync Expenses
+      const unsyncedExpenses = await db.expenses.where('synced').equals(0).toArray();
+      if (unsyncedExpenses.length > 0) {
+        console.log(`[Sync] Pushing ${unsyncedExpenses.length} expense entry(ies) to server...`);
+        const payload = unsyncedExpenses.map(({ local_id, synced, ...rest }) => rest);
+        const result = await api.importExpensesBulk(payload);
+        if (result && result.success) {
+          await db.transaction('rw', db.expenses, async () => {
+            for (const exp of unsyncedExpenses) {
+              await db.expenses.update(exp.local_id, { synced: 1 });
             }
-          }
-        });
-        console.log(`[Sync] Successfully synchronized ${unsyncedSales.length} transaction(s) ✓`);
+          });
+          console.log(`[Sync] Successfully synchronized ${unsyncedExpenses.length} expense(s) ✓`);
+        }
       }
+
+      console.log('[Sync] Database check complete ✓');
     } catch (err) {
       console.error('[Sync] Sync process failed:', err.message);
     } finally {
@@ -92,11 +102,15 @@ const SyncEngine = {
       statusEl.className = 'status-badge syncing';
       statusTextEl.innerText = 'Syncing...';
     } else {
-      // Check if there are any remaining unsynced items
-      db.sales.where('synced').equals(0).count().then(count => {
-        if (count > 0) {
+      // Check if there are any remaining unsynced sales or expenses
+      Promise.all([
+        db.sales.where('synced').equals(0).count(),
+        db.expenses.where('synced').equals(0).count()
+      ]).then(([salesCount, expensesCount]) => {
+        const totalPending = salesCount + expensesCount;
+        if (totalPending > 0) {
           statusEl.className = 'status-badge pending';
-          statusTextEl.innerText = `${count} pending sync`;
+          statusTextEl.innerText = `${totalPending} pending sync`;
         } else {
           statusEl.className = 'status-badge synced';
           statusTextEl.innerText = 'Synced';
