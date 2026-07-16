@@ -29,48 +29,22 @@ db.version(2).stores({
 
 // Helper functions for common Dexie operations
 const dbHelper = {
-  // Clear all local tables (useful for complete refresh / reset)
-  async clearAll() {
-    await db.transaction('rw', db.master_catalog, db.products, db.sales, db.expenses, async () => {
-      await db.master_catalog.clear();
-      await db.products.clear();
-      await db.sales.clear();
-      await db.expenses.clear();
-    });
-    console.log('[Dexie] Local database cleared.');
+  // Normalize barcode by trimming and removing leading zeros
+  normalizeBarcode(barcode) {
+    if (barcode === undefined || barcode === null) return '';
+    const cleaned = String(barcode).trim();
+    const stripped = cleaned.replace(/^0+/, '');
+    return stripped === '' ? '0' : stripped;
   },
 
   // Retrieve item details joined with catalog details by barcode
-  // Supports robust matching for padded/stripped barcodes (Excel number formatting fixes)
   async getProductByBarcode(originalBarcode) {
-    const barcode = String(originalBarcode).trim();
-    let product = await db.products.get(barcode);
-    let matchedBarcode = barcode;
-
-    // 1. If not found, try stripping leading zeros (case where Excel lost leading zeros but scanner has them)
-    if (!product && barcode.startsWith('0')) {
-      const stripped = barcode.replace(/^0+/, '');
-      product = await db.products.get(stripped);
-      if (product) matchedBarcode = stripped;
-    }
-
-    // 2. If still not found, try padding to UPC (12 digits) with leading zeros
-    if (!product && barcode.length < 12) {
-      const padded12 = barcode.padStart(12, '0');
-      product = await db.products.get(padded12);
-      if (product) matchedBarcode = padded12;
-    }
-
-    // 3. If still not found, try padding to EAN (13 digits)
-    if (!product && barcode.length < 13) {
-      const padded13 = barcode.padStart(13, '0');
-      product = await db.products.get(padded13);
-      if (product) matchedBarcode = padded13;
-    }
+    const barcode = this.normalizeBarcode(originalBarcode);
+    const product = await db.products.get(barcode);
 
     if (!product) return null;
     
-    const catalog = await db.master_catalog.get(matchedBarcode);
+    const catalog = await db.master_catalog.get(barcode);
     return {
       barcode: product.barcode,
       product_name: catalog ? catalog.product_name : 'Unknown Product',
@@ -81,6 +55,17 @@ const dbHelper = {
       rappi_price: Number(product.rappi_price) || 0,
       stock: parseInt(product.stock) || 0
     };
+  },
+
+  // Clear all local tables (useful for complete refresh / reset)
+  async clearAll() {
+    await db.transaction('rw', db.master_catalog, db.products, db.sales, db.expenses, async () => {
+      await db.master_catalog.clear();
+      await db.products.clear();
+      await db.sales.clear();
+      await db.expenses.clear();
+    });
+    console.log('[Dexie] Local database cleared.');
   }
 };
 

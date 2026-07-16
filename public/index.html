@@ -286,6 +286,16 @@
             </div>
 
             <div class="help-divider"></div>
+            <div class="cloud-sync-zone" style="margin-bottom: 20px;">
+              <h4>Cloud Inventory Download</h4>
+              <p>Download the latest product catalog and live inventory levels from the server database.</p>
+              <button id="btn-pull-cloud" class="btn-primary btn-block" style="display: flex; align-items: center; justify-content: center; gap: 8px; cursor: pointer; height: 38px;">
+                <span class="material-icons-outlined">cloud_download</span>
+                <span>Pull from Cloud</span>
+              </button>
+            </div>
+
+            <div class="help-divider"></div>
             <div class="db-reset-zone">
               <h4>Database Reset</h4>
               <p>Warning: This will delete all local transaction data, product stock, and catalog references stored in this browser.</p>
@@ -566,7 +576,8 @@
             </div>
           </div>
         </div>
-        <div class="modal-footer" style="margin-top: 20px; display: flex; justify-content: flex-end; gap: 12px;">
+        <div class="modal-footer" style="margin-top: 20px; display: flex; justify-content: flex-end; gap: 12px; align-items: center;">
+          <button type="button" id="inv-modal-delete" class="btn-checkout" style="margin-top: 0; width: auto; background-color: var(--color-danger); border: none; margin-right: auto;" onclick="App.deleteProductCurrent()">Delete Product</button>
           <button type="button" class="btn-secondary" onclick="App.closeInventoryModal()">Cancel</button>
           <button type="submit" class="btn-checkout" style="margin-top: 0; width: auto; background-color: var(--color-primary); border: none;">Save Product</button>
         </div>

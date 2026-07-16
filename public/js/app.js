@@ -30,6 +30,18 @@ const App = {
     // Initial data load
     await this.loadInventory();
     await this.loadReports();
+
+    // Auto-pull database on first-time load/new device
+    try {
+      const productCount = await db.products.count();
+      if (productCount === 0 && SyncEngine.onlineStatus) {
+        console.log('[App] Local database is empty. Triggering automatic cloud pull...');
+        POS.showToast('Empty database detected. Syncing catalog from cloud...', 'info');
+        this.handlePullFromCloud().catch(console.error);
+      }
+    } catch (dbErr) {
+      console.warn('[App] Failed to check local db count for auto-pull:', dbErr);
+    }
   },
 
   // Setup tab routing
@@ -93,6 +105,11 @@ const App = {
         await this.handleImport(file, 'expenses');
         expensesInput.value = ''; // clear
       });
+    }
+
+    const pullCloudBtn = document.getElementById('btn-pull-cloud');
+    if (pullCloudBtn) {
+      pullCloudBtn.addEventListener('click', () => this.handlePullFromCloud());
     }
   },
 
@@ -190,6 +207,103 @@ const App = {
     }
   },
 
+  // Pull catalog and inventory from the cloud database into IndexedDB
+  async handlePullFromCloud() {
+    const progressCard = document.getElementById('import-progress-card');
+    const progressTitle = document.getElementById('progress-title');
+    const progressBarFill = document.getElementById('progress-bar-fill');
+    const progressStatus = document.getElementById('progress-status');
+
+    if (!progressCard) return;
+
+    progressCard.classList.remove('hidden');
+    progressTitle.innerText = 'Downloading Cloud Data...';
+    progressBarFill.style.width = '0%';
+    progressBarFill.style.backgroundColor = 'var(--color-primary)';
+    progressStatus.innerText = 'Connecting to server...';
+
+    const updateProgress = (text, percent) => {
+      progressStatus.innerText = text;
+      progressBarFill.style.width = `${percent}%`;
+    };
+
+    try {
+      await this.pullFromCloud(updateProgress);
+      POS.showToast('Cloud database downloaded successfully!', 'success');
+      await this.loadInventory();
+      // Hide progress indicator after success delay
+      setTimeout(() => progressCard.classList.add('hidden'), 2000);
+    } catch (err) {
+      console.error(err);
+      updateProgress(`Error: ${err.message}`, 100);
+      progressBarFill.style.backgroundColor = 'var(--color-danger)';
+      POS.showToast('Cloud pull failed: ' + err.message, 'error');
+    }
+  },
+
+  async pullFromCloud(progressCallback) {
+    if (!SyncEngine.onlineStatus) {
+      throw new Error('System is offline. Cannot connect to the cloud server.');
+    }
+
+    if (progressCallback) progressCallback('Fetching Master Catalog from cloud...', 15);
+    const catalogRes = await api.getCatalog();
+    const catalogRows = catalogRes.data || [];
+
+    if (progressCallback) progressCallback(`Saving ${catalogRows.length} catalog items locally...`, 40);
+    // Bulk put catalog into Dexie
+    if (catalogRows.length > 0) {
+      await db.transaction('rw', db.master_catalog, async () => {
+        await db.master_catalog.clear();
+        await db.master_catalog.bulkPut(catalogRows);
+      });
+    }
+
+    if (progressCallback) progressCallback('Fetching Live Inventory from cloud...', 60);
+    const productsRes = await api.getProducts();
+    const productsRows = productsRes.data || [];
+
+    if (progressCallback) progressCallback(`Saving ${productsRows.length} product records locally...`, 80);
+    if (productsRows.length > 0) {
+      await db.transaction('rw', db.products, db.master_catalog, async () => {
+        await db.products.clear();
+        
+        // Map products response to local schema and fill catalog if missing
+        const productsToPut = [];
+        const missingCatalogEntries = [];
+        
+        for (const p of productsRows) {
+          productsToPut.push({
+            barcode: p.barcode,
+            supplier: p.supplier || 'Unknown',
+            cost_price: Number(p.cost_price) || 0,
+            sale_price: Number(p.sale_price) || 0,
+            rappi_price: Number(p.rappi_price) || Number(p.sale_price) || 0,
+            stock: parseInt(p.stock) || 0,
+            updated_at: p.updated_at || new Date().toISOString()
+          });
+
+          // Check if catalog has it
+          const exists = await db.master_catalog.get(p.barcode);
+          if (!exists) {
+            missingCatalogEntries.push({
+              barcode: p.barcode,
+              product_name: p.product_name || 'Product ' + p.barcode,
+              category: p.category || 'General'
+            });
+          }
+        }
+
+        if (missingCatalogEntries.length > 0) {
+          await db.master_catalog.bulkPut(missingCatalogEntries);
+        }
+        await db.products.bulkPut(productsToPut);
+      });
+    }
+
+    if (progressCallback) progressCallback('Cloud synchronization complete ✓', 100);
+  },
+
   // Load local inventory and render data table
   async loadInventory() {
     const tbody = document.getElementById('inventory-tbody');
@@ -202,7 +316,12 @@ const App = {
         tbody.innerHTML = `
           <tr>
             <td colspan="9" class="text-center" style="padding: 40px 0;">
-              No products found. Go to <strong>Excel Importer</strong> or click <strong>Add Product</strong>.
+              No products found. 
+              <button class="btn-primary" onclick="App.handlePullFromCloud()" style="display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; margin-left: 8px; cursor: pointer; height: auto; border: none; border-radius: 4px; font-weight: 500;">
+                <span class="material-icons-outlined" style="font-size: 16px;">cloud_download</span>
+                <span>Pull from Cloud</span>
+              </button>
+              or go to the <strong>Excel Importer</strong>.
             </td>
           </tr>
         `;
@@ -216,7 +335,7 @@ const App = {
         const category = cat ? cat.category : 'General';
         
         const stock = parseInt(p.stock) || 0;
-        const stockClass = stock <= 5 ? 'low' : 'normal';
+        const stockClass = stock <= 0 ? 'negative' : 'positive';
 
         html += `
           <tr>
@@ -398,7 +517,7 @@ const App = {
   async deleteSale(serverId, localId) {
     console.log('[App] deleteSale invoked:', { serverId, localId });
     
-    const confirmed = await this.showConfirm('Are you absolutely sure you want to void this sale? This will permanently delete the transaction and return the items back to inventory stock.');
+    const confirmed = await this.showConfirm('Are you absolutely sure you want to void this sale? This will permanently delete the transaction and return the items back to inventory stock.', 'Void Sale');
     if (!confirmed) {
       console.log('[App] deleteSale cancelled by user');
       return;
@@ -448,7 +567,7 @@ const App = {
   },
 
   // Custom confirm dialog helper returning a Promise
-  async showConfirm(message) {
+  async showConfirm(message, acceptText = 'Confirm') {
     return new Promise((resolve) => {
       const modal = document.getElementById('confirm-modal');
       const msgEl = document.getElementById('confirm-modal-message');
@@ -461,6 +580,7 @@ const App = {
       }
 
       if (message) msgEl.innerText = message;
+      if (acceptBtn) acceptBtn.innerText = acceptText;
       modal.classList.remove('hidden');
 
       const cleanup = (result) => {
@@ -484,7 +604,7 @@ const App = {
 
     scanForm.addEventListener('submit', async (e) => {
       e.preventDefault();
-      const barcode = scanInput.value.trim();
+      const barcode = dbHelper.normalizeBarcode(scanInput.value);
       if (!barcode) return;
 
       scanInput.value = '';
@@ -504,11 +624,17 @@ const App = {
     const modal = document.getElementById('inventory-modal');
     if (!modal) return;
 
+    const barcode = dbHelper.normalizeBarcode(prefilledBarcode);
+
     document.getElementById('inventory-modal-title').innerText = 'Register New Product';
     document.getElementById('inventory-modal-icon').className = 'material-icons-outlined modal-icon text-success';
     
+    // Hide Delete button in registration mode
+    const deleteBtn = document.getElementById('inv-modal-delete');
+    if (deleteBtn) deleteBtn.style.display = 'none';
+
     const barcodeInput = document.getElementById('inv-modal-barcode');
-    barcodeInput.value = prefilledBarcode;
+    barcodeInput.value = barcode;
     barcodeInput.removeAttribute('readonly');
     barcodeInput.style.backgroundColor = '';
     barcodeInput.style.color = '';
@@ -524,7 +650,7 @@ const App = {
     document.getElementById('inv-modal-adjust').placeholder = 'Initial stock level';
 
     modal.classList.remove('hidden');
-    if (prefilledBarcode) {
+    if (barcode) {
       document.getElementById('inv-modal-name').focus();
     } else {
       barcodeInput.focus();
@@ -536,6 +662,7 @@ const App = {
     const modal = document.getElementById('inventory-modal');
     if (!modal) return;
 
+    barcode = dbHelper.normalizeBarcode(barcode);
     const product = await db.products.get(barcode);
     const catalog = await db.master_catalog.get(barcode);
 
@@ -546,6 +673,10 @@ const App = {
 
     document.getElementById('inventory-modal-title').innerText = 'Adjust Product Details';
     document.getElementById('inventory-modal-icon').className = 'material-icons-outlined modal-icon text-primary';
+
+    // Show Delete button in edit mode
+    const deleteBtn = document.getElementById('inv-modal-delete');
+    if (deleteBtn) deleteBtn.style.display = 'block';
 
     const barcodeInput = document.getElementById('inv-modal-barcode');
     barcodeInput.value = barcode;
@@ -576,7 +707,7 @@ const App = {
   async saveAdjustment(event) {
     event.preventDefault();
 
-    const barcode = document.getElementById('inv-modal-barcode').value.trim();
+    const barcode = dbHelper.normalizeBarcode(document.getElementById('inv-modal-barcode').value);
     const name = document.getElementById('inv-modal-name').value.trim();
     const category = document.getElementById('inv-modal-category').value.trim();
     const supplier = document.getElementById('inv-modal-supplier').value.trim() || 'Unknown';
@@ -636,6 +767,40 @@ const App = {
     } catch (err) {
       console.error('[Inventory] Failed to save product:', err);
       POS.showToast('Failed to save product: ' + err.message, 'error');
+    }
+  },
+
+  // Delete current product in inventory modal
+  async deleteProductCurrent() {
+    const barcodeInput = document.getElementById('inv-modal-barcode');
+    if (!barcodeInput) return;
+    const barcode = dbHelper.normalizeBarcode(barcodeInput.value);
+    if (!barcode) return;
+
+    const confirmed = await this.showConfirm('Are you absolutely sure you want to delete this product? This will permanently remove it from the catalog and inventory.', 'Delete Product');
+    if (!confirmed) return;
+
+    try {
+      if (SyncEngine.onlineStatus) {
+        // Call server route to delete from Postgres (cascading)
+        await api.deleteProduct(barcode);
+      } else {
+        POS.showToast('Deleting offline. Note: product will reappear if synced or pulled from cloud later.', 'warning');
+      }
+
+      // Delete locally from Dexie
+      await db.transaction('rw', db.master_catalog, db.products, async () => {
+        await db.master_catalog.delete(barcode);
+        await db.products.delete(barcode);
+      });
+
+      POS.showToast('Product deleted successfully!', 'success');
+      this.closeInventoryModal();
+      await this.loadInventory();
+
+    } catch (err) {
+      console.error('[Inventory] Failed to delete product:', err);
+      POS.showToast('Failed to delete product: ' + err.message, 'error');
     }
   },
 

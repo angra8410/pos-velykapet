@@ -24,7 +24,7 @@ const POS = {
     if (scanForm && scanInput) {
       scanForm.addEventListener('submit', async (e) => {
         e.preventDefault();
-        const barcode = scanInput.value.trim();
+        const barcode = dbHelper.normalizeBarcode(scanInput.value);
         if (barcode) {
           await this.scanProduct(barcode);
           scanInput.value = '';
@@ -67,8 +67,9 @@ const POS = {
   },
 
   // Lookup and add product via barcode scan
-  async scanProduct(barcode) {
+  async scanProduct(originalBarcode) {
     try {
+      const barcode = dbHelper.normalizeBarcode(originalBarcode);
       const product = await dbHelper.getProductByBarcode(barcode);
       
       if (!product) {

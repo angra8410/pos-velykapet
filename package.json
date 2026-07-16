@@ -6,7 +6,8 @@
   "scripts": {
     "start": "node server/index.js",
     "dev": "nodemon server/index.js",
-    "migrate": "node server/scripts/migrate.js"
+    "migrate": "node server/scripts/migrate.js",
+    "clean-duplicates": "node server/scripts/clean-duplicates.js"
   },
   "engines": {
     "node": ">=18.0.0"

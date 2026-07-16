@@ -143,5 +143,37 @@ const api = {
       throw new Error(err.error || 'Failed to delete expense entry');
     }
     return await res.json();
+  },
+
+  // Delete a specific product record by barcode (cascades on server)
+  async deleteProduct(barcode) {
+    const res = await this.fetchWithAuth(`${API_BASE}/catalog/${barcode}`, {
+      method: 'DELETE'
+    });
+    if (!res.ok) {
+      const err = await res.json();
+      throw new Error(err.error || 'Failed to delete product');
+    }
+    return await res.json();
+  },
+
+  // Get all catalog entries from server
+  async getCatalog() {
+    const res = await this.fetchWithAuth(`${API_BASE}/catalog`);
+    if (!res.ok) {
+      const err = await res.json();
+      throw new Error(err.error || 'Failed to fetch catalog from server');
+    }
+    return await res.json();
+  },
+
+  // Get all products from server
+  async getProducts() {
+    const res = await this.fetchWithAuth(`${API_BASE}/products`);
+    if (!res.ok) {
+      const err = await res.json();
+      throw new Error(err.error || 'Failed to fetch products from server');
+    }
+    return await res.json();
   }
 };

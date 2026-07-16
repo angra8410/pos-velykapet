@@ -136,14 +136,14 @@ const ExcelImporter = {
       const item = {};
       
       if (type === 'catalog') {
-        item.barcode = String(row[mapping.barcode] || '').trim();
+        item.barcode = dbHelper.normalizeBarcode(row[mapping.barcode]);
         item.product_name = String(row[mapping.product_name] || '').trim();
         item.category = String(row[mapping.category] || 'General').trim();
         
         // Skip rows without valid barcode or name
         if (!item.barcode || !item.product_name) return null;
       } else {
-        item.barcode = String(row[mapping.barcode] || '').trim();
+        item.barcode = dbHelper.normalizeBarcode(row[mapping.barcode]);
         item.supplier = String(row[mapping.supplier] || 'Unknown').trim();
         item.cost_price = this.parseNumber(row[mapping.cost_price]);
         item.sale_price = this.parseNumber(row[mapping.sale_price]);

@@ -720,13 +720,18 @@ button {
   font-weight: 600;
 }
 
-.stock-pill.low {
-  background-color: rgba(239, 68, 68, 0.1);
+.stock-pill.negative, .stock-pill.low {
+  background-color: rgba(239, 68, 68, 0.15);
   color: var(--color-danger);
 }
 
-.stock-pill.normal {
-  background-color: rgba(16, 185, 129, 0.1);
+.stock-pill.zero {
+  background-color: rgba(245, 158, 11, 0.15);
+  color: var(--color-warning);
+}
+
+.stock-pill.positive, .stock-pill.normal {
+  background-color: rgba(16, 185, 129, 0.15);
   color: var(--color-success);
 }
 
