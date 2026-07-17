@@ -205,7 +205,8 @@ body {
   border-right: 1px solid var(--border-color);
   display: flex;
   flex-direction: column;
-  justify-content: space-between;
+  justify-content: flex-start;
+  gap: 8px;
   padding: 16px;
   flex-shrink: 0;
   transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1), padding 0.3s cubic-bezier(0.4, 0, 0.2, 1);
@@ -307,6 +308,7 @@ body {
 
 .sidebar-footer {
   text-align: center;
+  margin-top: auto;
 }
 
 .version-label {
