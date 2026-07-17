@@ -40,6 +40,8 @@
   
   --transition-fast: 0.15s ease;
   --transition-normal: 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+
+  --bg-hover: rgba(255, 255, 255, 0.05);
 }
 
 /* Reset and Core Defaults */
@@ -187,7 +189,7 @@ body {
 }
 
 .btn-sync-now:hover {
-  background-color: rgba(255, 255, 255, 0.05);
+  background-color: var(--bg-hover);
   color: var(--color-primary);
   border-color: var(--color-primary);
 }
@@ -243,7 +245,7 @@ body {
 }
 
 .btn-sidebar-toggle:hover {
-  background-color: rgba(255, 255, 255, 0.05);
+  background-color: var(--bg-hover);
   color: var(--text-main);
 }
 
@@ -1259,5 +1261,140 @@ button {
   from { transform: rotate(0deg); }
   to { transform: rotate(360deg); }
 }
+
+/* Theme Toggle Button Styling */
+.btn-theme-toggle {
+  background: none;
+  border: 1px solid var(--border-color);
+  color: var(--text-main);
+  padding: 6px;
+  border-radius: 50%;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all var(--transition-normal);
+}
+
+.btn-theme-toggle:hover {
+  background-color: var(--bg-hover);
+  color: var(--color-primary);
+  border-color: var(--color-primary);
+  transform: rotate(20deg) scale(1.08);
+}
+
+/* Light Theme Variables Override */
+html[data-theme="light"] {
+  --bg-app: #f1f5f9;
+  --bg-sidebar: #ffffff;
+  --bg-card: #ffffff;
+  --bg-card-hover: #f8fafc;
+  --bg-input: #f1f5f9;
+  
+  --border-color: rgba(15, 23, 42, 0.08);
+  --border-focus: #7c3aed;
+  
+  --text-main: #0f172a;
+  --text-muted: #64748b;
+  --text-inverse: #ffffff;
+  
+  --color-primary: #7c3aed;
+  --color-primary-hover: #6d28d9;
+  --bg-hover: rgba(15, 23, 42, 0.04);
+  
+  --shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.05);
+  --shadow-md: 0 4px 6px -1px rgba(15, 23, 42, 0.05), 0 2px 4px -1px rgba(15, 23, 42, 0.03);
+  --shadow-glow: 0 0 15px rgba(124, 58, 237, 0.08);
+}
+
+/* Light Theme Element Overrides */
+html[data-theme="light"] .summary-totals-card {
+  background: linear-gradient(135deg, var(--bg-card), #e2e8f0);
+}
+
+html[data-theme="light"] .nav-btn:hover {
+  background-color: rgba(15, 23, 42, 0.02);
+}
+
+html[data-theme="light"] .nav-btn.active {
+  background: linear-gradient(135deg, rgba(124, 58, 237, 0.12), rgba(124, 58, 237, 0.03));
+  color: var(--color-primary);
+}
+
+html[data-theme="light"] .sale-type-tag {
+  color: var(--color-primary);
+  background: rgba(124, 58, 237, 0.08);
+  border-color: rgba(124, 58, 237, 0.15);
+}
+
+html[data-theme="light"] .sale-row-clickable:hover {
+  background-color: rgba(15, 23, 42, 0.02) !important;
+}
+
+html[data-theme="light"] .sale-row-clickable.expanded {
+  background-color: rgba(15, 23, 42, 0.01) !important;
+}
+
+html[data-theme="light"] .details-row {
+  background-color: rgba(15, 23, 42, 0.02) !important;
+}
+
+/* System Preference Theme Overrides (Follows OS Theme) */
+@media (prefers-color-scheme: light) {
+  html[data-theme="system"] {
+    --bg-app: #f1f5f9;
+    --bg-sidebar: #ffffff;
+    --bg-card: #ffffff;
+    --bg-card-hover: #f8fafc;
+    --bg-input: #f1f5f9;
+    
+    --border-color: rgba(15, 23, 42, 0.08);
+    --border-focus: #7c3aed;
+    
+    --text-main: #0f172a;
+    --text-muted: #64748b;
+    --text-inverse: #ffffff;
+    
+    --color-primary: #7c3aed;
+    --color-primary-hover: #6d28d9;
+    --bg-hover: rgba(15, 23, 42, 0.04);
+    
+    --shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.05);
+    --shadow-md: 0 4px 6px -1px rgba(15, 23, 42, 0.05), 0 2px 4px -1px rgba(15, 23, 42, 0.03);
+    --shadow-glow: 0 0 15px rgba(124, 58, 237, 0.08);
+  }
+
+  html[data-theme="system"] .summary-totals-card {
+    background: linear-gradient(135deg, var(--bg-card), #e2e8f0);
+  }
+
+  html[data-theme="system"] .nav-btn:hover {
+    background-color: rgba(15, 23, 42, 0.02);
+  }
+
+  html[data-theme="system"] .nav-btn.active {
+    background: linear-gradient(135deg, rgba(124, 58, 237, 0.12), rgba(124, 58, 237, 0.03));
+    color: var(--color-primary);
+  }
+
+  html[data-theme="system"] .sale-type-tag {
+    color: var(--color-primary);
+    background: rgba(124, 58, 237, 0.08);
+    border-color: rgba(124, 58, 237, 0.15);
+  }
+
+  html[data-theme="system"] .sale-row-clickable:hover {
+    background-color: rgba(15, 23, 42, 0.02) !important;
+  }
+
+  html[data-theme="system"] .sale-row-clickable.expanded {
+    background-color: rgba(15, 23, 42, 0.01) !important;
+  }
+
+  html[data-theme="system"] .details-row {
+    background-color: rgba(15, 23, 42, 0.02) !important;
+  }
+}
+
 
 

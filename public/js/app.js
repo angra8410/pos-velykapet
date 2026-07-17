@@ -9,6 +9,7 @@ const App = {
   activeTab: 'tab-pos',
 
   async init() {
+    this.setupTheme();
     this.setupRouter();
     this.setupImporterUI();
     this.setupSearch();
@@ -76,6 +77,48 @@ const App = {
       }
     } catch (dbErr) {
       console.warn('[App] Failed to check local db count for auto-pull:', dbErr);
+    }
+  },
+
+  // Setup 3-state theme switching (Dark, Light, System)
+  setupTheme() {
+    const savedTheme = localStorage.getItem('pos_theme') || 'system';
+    this.updateThemeIcon(savedTheme);
+
+    const themeToggleBtn = document.getElementById('theme-toggle-btn');
+    if (themeToggleBtn) {
+      themeToggleBtn.addEventListener('click', () => {
+        const currentTheme = localStorage.getItem('pos_theme') || 'system';
+        let nextTheme = 'dark';
+        if (currentTheme === 'dark') {
+          nextTheme = 'light';
+        } else if (currentTheme === 'light') {
+          nextTheme = 'system';
+        } else {
+          nextTheme = 'dark';
+        }
+        
+        localStorage.setItem('pos_theme', nextTheme);
+        document.documentElement.setAttribute('data-theme', nextTheme);
+        this.updateThemeIcon(nextTheme);
+      });
+    }
+  },
+
+  updateThemeIcon(theme) {
+    const iconEl = document.getElementById('theme-toggle-icon');
+    const btnEl = document.getElementById('theme-toggle-btn');
+    if (!iconEl) return;
+    
+    if (theme === 'light') {
+      iconEl.innerText = 'light_mode';
+      if (btnEl) btnEl.title = 'Theme: Light';
+    } else if (theme === 'dark') {
+      iconEl.innerText = 'dark_mode';
+      if (btnEl) btnEl.title = 'Theme: Dark';
+    } else {
+      iconEl.innerText = 'brightness_auto';
+      if (btnEl) btnEl.title = 'Theme: System';
     }
   },
 

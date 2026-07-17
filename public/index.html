@@ -17,6 +17,12 @@
   <!-- CDNs for Local-First Operations -->
   <script src="https://unpkg.com/dexie@3.2.4/dist/dexie.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <script>
+    (function() {
+      const savedTheme = localStorage.getItem('pos_theme') || 'system';
+      document.documentElement.setAttribute('data-theme', savedTheme);
+    })();
+  </script>
 </head>
 <body>
 
@@ -32,6 +38,11 @@
     
     <!-- Sync Engine Status Widget -->
     <div class="sync-widget">
+      <!-- Theme Toggle Button -->
+      <button id="theme-toggle-btn" class="btn-theme-toggle" title="Switch Theme">
+        <span class="material-icons-outlined" id="theme-toggle-icon">brightness_auto</span>
+      </button>
+
       <div id="sync-status-indicator" class="status-badge synced">
         <span class="pulse-dot"></span>
         <span id="sync-status-text">Connected</span>
