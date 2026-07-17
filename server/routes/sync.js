@@ -42,7 +42,14 @@ router.post('/', async (req, res) => {
           [local_id]
         );
         if (existing.rowCount > 0) {
-          results.push({ local_id, server_id: existing.rows[0].id, status: 'skipped' });
+          // Backfill/update the invoice_number on PostgreSQL if it was missing
+          await client.query(
+            `UPDATE sales 
+                SET invoice_number = COALESCE(invoice_number, $1)
+              WHERE local_id = $2`,
+            [invoice_number || null, local_id]
+          );
+          results.push({ local_id, server_id: existing.rows[0].id, status: 'updated' });
           continue;
         }
       }

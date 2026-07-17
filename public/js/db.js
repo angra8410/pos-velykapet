@@ -102,6 +102,29 @@ const dbHelper = {
       }
     });
     console.log('[Dexie] Local barcode normalization check complete.');
+  },
+
+  // Backfill invoice numbers for existing local sales records
+  async backfillInvoiceNumbers() {
+    console.log('[Dexie] Checking local sales for invoice numbering backfill...');
+    await db.transaction('rw', db.sales, async () => {
+      const allSales = await db.sales.toArray();
+      let updatedCount = 0;
+      for (const s of allSales) {
+        if (!s.invoice_number) {
+          const year = new Date(s.timestamp).getFullYear().toString().slice(-2);
+          const deviceId = localStorage.getItem('pos_device_id') || '1';
+          const seq = String(s.local_id).padStart(5, '0');
+          const invoiceNum = `VK-${year}-${deviceId}-${seq}`;
+          
+          await db.sales.update(s.local_id, { invoice_number: invoiceNum, synced: 0 });
+          updatedCount++;
+        }
+      }
+      if (updatedCount > 0) {
+        console.log(`[Dexie] Backfilled invoice numbers for ${updatedCount} sales. Triggering sync...`);
+      }
+    });
   }
 };
 

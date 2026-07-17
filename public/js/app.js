@@ -48,9 +48,19 @@ const App = {
       });
     }
 
+    // Run backfill for old invoice numbers
+    try {
+      await dbHelper.backfillInvoiceNumbers();
+    } catch (bfErr) {
+      console.warn('[App] Invoice backfill failed:', bfErr);
+    }
+
     // Bootstrap other modules
     SyncEngine.init();
     POS.init();
+
+    // Trigger sync to push backfilled invoices
+    SyncEngine.runSync().catch(console.error);
 
     // Initial data load
     await this.loadInventory();
