@@ -271,6 +271,15 @@ const POS = {
         // Save sale header (generates auto local_id)
         localId = await db.sales.add(saleRecord);
         
+        // Generate structured invoice number
+        const year = new Date(saleRecord.timestamp).getFullYear().toString().slice(-2);
+        const deviceId = localStorage.getItem('pos_device_id') || '1';
+        const seq = String(localId).padStart(5, '0');
+        const invoiceNum = `VK-${year}-${deviceId}-${seq}`;
+        
+        await db.sales.update(localId, { invoice_number: invoiceNum });
+        saleRecord.invoice_number = invoiceNum; // set on object in memory for receipt print
+        
         // Update local stock for each product
         for (const item of saleRecord.items) {
           const product = await db.products.get(item.barcode);
@@ -281,7 +290,7 @@ const POS = {
           }
         }
         
-        console.log(`[POS] Sale saved locally with local_id ${localId} ✓`);
+        console.log(`[POS] Sale saved locally with invoice_number ${invoiceNum} ✓`);
       });
 
       // 2. Play checkout success sound & notify user with receipt option
@@ -534,7 +543,7 @@ const POS = {
       <!DOCTYPE html>
       <html>
       <head>
-        <title>VelyKaPet Receipt</title>
+        <title>${sale.invoice_number || `Ticket_L-${sale.local_id}`}</title>
         <style>
           @page {
             size: auto;
@@ -607,7 +616,10 @@ const POS = {
             <td class="text-right">${sale.payment_method}</td>
           </tr>
           ${sale.transaction_code ? `<tr><td>Ref:</td><td class="text-right">${sale.transaction_code}</td></tr>` : ''}
-          ${sale.local_id ? `<tr><td>Ticket ID:</td><td class="text-right">#L-${sale.local_id}</td></tr>` : ''}
+          <tr>
+            <td>Factura Nro:</td>
+            <td class="text-right">${sale.invoice_number || `#L-${sale.local_id}`}</td>
+          </tr>
         </table>
 
         <table class="items-table">

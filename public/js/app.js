@@ -31,6 +31,23 @@ const App = {
       console.warn('[App] Local barcode migration failed:', migErr);
     }
 
+    // Initialize device ID settings
+    if (!localStorage.getItem('pos_device_id')) {
+      localStorage.setItem('pos_device_id', '1');
+    }
+    const deviceIdInput = document.getElementById('settings-device-id');
+    if (deviceIdInput) {
+      deviceIdInput.value = localStorage.getItem('pos_device_id') || '1';
+      deviceIdInput.addEventListener('change', (e) => {
+        let val = parseInt(e.target.value) || 1;
+        if (val < 1) val = 1;
+        if (val > 99) val = 99;
+        e.target.value = val;
+        localStorage.setItem('pos_device_id', String(val));
+        POS.showToast(`Device ID updated to ${val}`, 'success');
+      });
+    }
+
     // Bootstrap other modules
     SyncEngine.init();
     POS.init();
@@ -514,7 +531,10 @@ const App = {
 
       html += `
         <tr>
-          <td>${date}</td>
+          <td>
+            <strong style="color: var(--text-main); font-size: 13px;">${s.invoice_number || `#L-${localId}`}</strong>
+            <div style="font-size: 11px; color: var(--text-muted); margin-top: 2px;">${date}</div>
+          </td>
           <td><span class="origin-tag ${origin.toLowerCase()}">${origin}</span></td>
           <td>${payment}</td>
           <td class="text-center"><span class="sale-type-tag">${saleType}</span></td>

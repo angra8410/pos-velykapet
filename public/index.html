@@ -416,6 +416,10 @@
               <strong id="report-db-host">Postgres on Railway</strong>
             </div>
             <div class="sync-stat-row">
+              <span>POS Device ID:</span>
+              <input type="number" id="settings-device-id" min="1" max="99" style="width: 55px; background: var(--bg-card); border: 1px solid var(--border-color); border-radius: var(--radius-sm); padding: 3px 6px; color: var(--text-main); text-align: center; font-weight: bold;">
+            </div>
+            <div class="sync-stat-row">
               <span>Total Transactions on Server:</span>
               <strong id="report-server-sales-count">Loading...</strong>
             </div>
@@ -439,7 +443,7 @@
               <table class="report-table">
                 <thead>
                   <tr>
-                    <th>Timestamp</th>
+                    <th>Invoice / Timestamp</th>
                     <th>Origin</th>
                     <th>Payment Method</th>
                     <th>Sale Type</th>

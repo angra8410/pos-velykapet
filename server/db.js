@@ -16,13 +16,17 @@ pool.connect((err, client, release) => {
     console.warn('[DB] Make sure DATABASE_URL is set and the Postgres service is linked in Railway.');
     return;
   }
-  // Run schema migration to add sale_type if it does not exist
-  client.query("ALTER TABLE sales ADD COLUMN IF NOT EXISTS sale_type VARCHAR(50) DEFAULT 'Venta Comercial';", (alterErr) => {
+  // Run schema migrations for sale_type and invoice_number if they do not exist
+  const migrationQuery = `
+    ALTER TABLE sales ADD COLUMN IF NOT EXISTS sale_type VARCHAR(50) DEFAULT 'Venta Comercial';
+    ALTER TABLE sales ADD COLUMN IF NOT EXISTS invoice_number VARCHAR(100);
+  `;
+  client.query(migrationQuery, (alterErr) => {
     release();
     if (alterErr) {
-      console.error('[DB] Failed to run schema migration for sale_type:', alterErr.message);
+      console.error('[DB] Failed to run schema migrations:', alterErr.message);
     } else {
-      console.log('[DB] Database schema migration for sale_type completed successfully.');
+      console.log('[DB] Database schema migrations completed successfully.');
     }
   });
   console.log('[DB] Connected to PostgreSQL ✓');

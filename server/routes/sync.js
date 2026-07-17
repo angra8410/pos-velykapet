@@ -32,7 +32,7 @@ router.post('/', async (req, res) => {
       const {
         local_id, timestamp, origin, payment_method, transaction_code,
         total_amount, delivery_tower, delivery_apartment, delivery_complex,
-        notes, items, sale_type,
+        notes, items, sale_type, invoice_number,
       } = sale;
 
       // Skip if already synced (idempotency by local_id)
@@ -51,8 +51,8 @@ router.post('/', async (req, res) => {
       const saleRes = await client.query(
         `INSERT INTO sales
            (local_id, timestamp, origin, payment_method, transaction_code,
-            total_amount, delivery_tower, delivery_apartment, delivery_complex, notes, sale_type)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
+            total_amount, delivery_tower, delivery_apartment, delivery_complex, notes, sale_type, invoice_number)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
          RETURNING id`,
         [
           local_id || null, timestamp, origin, payment_method,
@@ -60,6 +60,7 @@ router.post('/', async (req, res) => {
           delivery_tower || null, delivery_apartment || null,
           delivery_complex || null, notes || null,
           sale_type || 'Venta Comercial',
+          invoice_number || null,
         ]
       );
       const serverId = saleRes.rows[0].id;
