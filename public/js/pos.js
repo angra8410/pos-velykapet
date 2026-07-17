@@ -182,7 +182,7 @@ const POS = {
             <div class="product-title">${item.product_name}</div>
             <div class="product-subtitle">${item.barcode} | ${item.supplier}</div>
           </td>
-          <td class="text-right">$${item.unit_price.toFixed(2)}</td>
+          <td class="text-right">${dbHelper.formatCOP(item.unit_price)}</td>
           <td>
             <div class="quantity-control">
               <button class="qty-btn" onclick="POS.updateQuantity('${item.barcode}', ${item.quantity - 1})">-</button>
@@ -191,8 +191,8 @@ const POS = {
               <button class="qty-btn" onclick="POS.updateQuantity('${item.barcode}', ${item.quantity + 1})">+</button>
             </div>
           </td>
-          <td class="text-right font-medium">$${linePrice.toFixed(2)}</td>
-          <td class="text-right text-success font-medium">$${(linePrice - lineCost).toFixed(2)}</td>
+          <td class="text-right font-medium">${dbHelper.formatCOP(linePrice)}</td>
+          <td class="text-right text-success font-medium">${dbHelper.formatCOP(linePrice - lineCost)}</td>
           <td class="text-center">
             <button class="btn-icon delete" onclick="POS.removeItem('${item.barcode}')">
               <span class="material-icons-outlined">delete_outline</span>
@@ -203,11 +203,11 @@ const POS = {
     });
 
     tbody.innerHTML = html;
-    summaryTotal.innerText = `$${totalPrice.toFixed(2)}`;
+    summaryTotal.innerText = dbHelper.formatCOP(totalPrice);
     summaryItems.innerText = totalQty;
     if (summaryProfit) {
       const profit = totalPrice - totalCost;
-      summaryProfit.innerText = `$${profit.toFixed(2)}`;
+      summaryProfit.innerText = dbHelper.formatCOP(profit);
     }
   },
 
@@ -378,7 +378,7 @@ const POS = {
             <div class="item-name">${match.product_name}</div>
             <div class="item-meta">
               <span>Barcode: ${match.barcode}</span>
-              <span>Stock: ${stock} | Price: $${price.toFixed(2)}</span>
+              <span>Stock: ${stock} | Price: ${dbHelper.formatCOP(price)}</span>
             </div>
           </div>
         `;

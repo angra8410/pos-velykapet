@@ -345,18 +345,28 @@ const App = {
         const stock = parseInt(p.stock) || 0;
         const stockClass = stock <= 0 ? 'negative' : 'positive';
 
+        const dateStr = p.updated_at ? new Date(p.updated_at).toLocaleString('es-CO', {
+          day: '2-digit',
+          month: '2-digit',
+          year: 'numeric',
+          hour: '2-digit',
+          minute: '2-digit',
+          hour12: false
+        }) : 'N/A';
+
         html += `
           <tr>
             <td class="font-medium">${p.barcode}</td>
             <td>${name}</td>
             <td><span class="category-tag">${category}</span></td>
             <td>${p.supplier || 'N/A'}</td>
-            <td class="text-right">$${Number(p.cost_price).toFixed(2)}</td>
-            <td class="text-right">$${Number(p.sale_price).toFixed(2)}</td>
-            <td class="text-right">$${Number(p.rappi_price).toFixed(2)}</td>
+            <td class="text-right">${dbHelper.formatCOP(p.cost_price)}</td>
+            <td class="text-right">${dbHelper.formatCOP(p.sale_price)}</td>
+            <td class="text-right">${dbHelper.formatCOP(p.rappi_price)}</td>
             <td class="text-center">
               <span class="stock-pill ${stockClass}">${stock} units</span>
             </td>
+            <td class="text-center text-muted" style="font-size: 13px;">${dateStr}</td>
             <td class="text-center">
               <button class="btn-icon" onclick="App.openAdjustmentModal('${p.barcode}')" style="color: var(--color-primary); cursor: pointer;">
                 <span class="material-icons-outlined">edit</span>
@@ -463,9 +473,9 @@ const App = {
         }
       });
 
-      kpiRevenue.innerText = `$${revenue.toFixed(2)}`;
+      kpiRevenue.innerText = dbHelper.formatCOP(revenue);
       kpiSales.innerText = sales.length;
-      kpiProfit.innerText = `$${profit.toFixed(2)}`;
+      kpiProfit.innerText = dbHelper.formatCOP(profit);
 
     } catch (err) {
       console.error('[App] Failed to load reports:', err);
@@ -507,7 +517,7 @@ const App = {
           <td><span class="origin-tag ${origin.toLowerCase()}">${origin}</span></td>
           <td>${payment}</td>
           <td class="text-center">${itemsCount}</td>
-          <td class="text-right font-medium">$${total.toFixed(2)}</td>
+          <td class="text-right font-medium">${dbHelper.formatCOP(total)}</td>
           <td>${apt}</td>
           <td><span class="report-notes">${s.notes || ''}</span></td>
           <td class="text-center">
@@ -707,6 +717,9 @@ const App = {
     document.getElementById('inv-modal-stock').value = '0';
     document.getElementById('inv-modal-adjust').value = '0';
     document.getElementById('inv-modal-adjust').placeholder = 'Initial stock level';
+    
+    const updatedAtEl = document.getElementById('inv-modal-updated-at');
+    if (updatedAtEl) updatedAtEl.innerText = 'N/A';
 
     modal.classList.remove('hidden');
     if (barcode) {
@@ -759,6 +772,18 @@ const App = {
     document.getElementById('inv-modal-stock').value = product.stock || 0;
     document.getElementById('inv-modal-adjust').value = '0';
     document.getElementById('inv-modal-adjust').placeholder = 'e.g. 10 or -5';
+    
+    const updatedAtEl = document.getElementById('inv-modal-updated-at');
+    if (updatedAtEl) {
+      updatedAtEl.innerText = product.updated_at ? new Date(product.updated_at).toLocaleString('es-CO', {
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: false
+      }) : 'N/A';
+    }
 
     modal.classList.remove('hidden');
     document.getElementById('inv-modal-adjust').focus();
@@ -1038,7 +1063,7 @@ const App = {
 
     tbody.innerHTML = expenses.map(exp => {
       const dateStr = new Date(exp.timestamp).toLocaleString();
-      const amountStr = Number(exp.amount).toLocaleString('en-US', { style: 'currency', currency: 'USD' });
+      const amountStr = dbHelper.formatCOP(exp.amount);
       const idVal = exp.id || `local_${exp.local_id}`;
 
       return `

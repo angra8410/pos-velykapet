@@ -37,6 +37,15 @@ const dbHelper = {
     return stripped === '' ? '0' : stripped;
   },
 
+  // Format currency with COP style dot separators for thousands, comma for decimals
+  formatCOP(amount) {
+    const num = Number(amount) || 0;
+    const parts = num.toFixed(2).split('.');
+    const integerPart = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+    const decimalPart = parts[1];
+    return decimalPart === '00' ? `$${integerPart}` : `$${integerPart},${decimalPart}`;
+  },
+
   // Retrieve item details joined with catalog details by barcode
   async getProductByBarcode(originalBarcode) {
     const barcode = this.normalizeBarcode(originalBarcode);
