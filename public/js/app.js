@@ -526,9 +526,12 @@ const App = {
     try {
       // 1. Fetch recent sales log from server (Postgres)
       const res = await api.checkHealth();
+      const limitEl = document.getElementById('sales-filter-limit');
+      const limitVal = Number(limitEl ? limitEl.value : 50);
+
       if (res) {
         // If server is online, fetch sales logs and metadata
-        const salesRes = await api.fetchWithAuth('/api/sales?limit=15');
+        const salesRes = await api.fetchWithAuth(`/api/sales?limit=${limitVal}`);
         if (salesRes.ok) {
           const salesData = await salesRes.json();
           this.renderSalesLogTable(salesData.data);
@@ -536,7 +539,7 @@ const App = {
 
         // Fetch recent expenses log from server
         try {
-          const expensesData = await api.getExpenses(15);
+          const expensesData = await api.getExpenses(limitVal);
           if (expensesData && expensesData.data) {
             this.renderExpensesLogTable(expensesData.data);
           }
@@ -553,10 +556,10 @@ const App = {
         }
       } else {
         // Fallback to local Dexie logs if offline
-        const localSales = await db.sales.orderBy('timestamp').reverse().limit(15).toArray();
+        const localSales = await db.sales.orderBy('timestamp').reverse().limit(limitVal).toArray();
         this.renderSalesLogTable(localSales);
 
-        const localExpenses = await db.expenses.orderBy('timestamp').reverse().limit(15).toArray();
+        const localExpenses = await db.expenses.orderBy('timestamp').reverse().limit(limitVal).toArray();
         this.renderExpensesLogTable(localExpenses);
 
         serverSalesCount.innerText = 'Offline';

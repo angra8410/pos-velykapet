@@ -447,12 +447,23 @@
 
           <!-- Sales Log Table -->
           <div class="card sales-log-card col-span-2">
-            <div class="panel-header">
+            <div class="panel-header" style="flex-wrap: wrap; gap: 12px;">
               <h2>Recent Sales Log (Railway Postgres)</h2>
-              <button class="btn-secondary" onclick="App.loadReports()">
-                <span class="material-icons-outlined">refresh</span>
-                <span>Refresh Log</span>
-              </button>
+              <div class="filter-group" style="display: flex; gap: 12px; align-items: center;">
+                <div class="form-group" style="margin: 0; display: flex; align-items: center; gap: 6px;">
+                  <label for="sales-filter-limit" style="font-size: 12px; color: var(--text-muted); margin: 0; white-space: nowrap;">Show:</label>
+                  <select id="sales-filter-limit" onchange="App.loadReports()" style="background: var(--bg-card); border: 1px solid var(--border-color); border-radius: var(--radius-sm); padding: 4px 8px; color: var(--text-main); font-size: 13px; cursor: pointer;">
+                    <option value="15">15 sales</option>
+                    <option value="50" selected>50 sales</option>
+                    <option value="100">100 sales</option>
+                    <option value="500">500 sales</option>
+                  </select>
+                </div>
+                <button class="btn-secondary" onclick="App.loadReports()">
+                  <span class="material-icons-outlined">refresh</span>
+                  <span>Refresh Log</span>
+                </button>
+              </div>
             </div>
             
             <div class="table-container">
