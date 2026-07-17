@@ -810,7 +810,8 @@ const App = {
     
     const costPrice = parseFloat(document.getElementById('inv-modal-cost').value) || 0;
     const salePrice = parseFloat(document.getElementById('inv-modal-retail').value) || 0;
-    const rappiPrice = parseFloat(document.getElementById('inv-modal-rappi').value) || salePrice;
+    const rappiRaw = document.getElementById('inv-modal-rappi').value;
+    const rappiPrice = (rappiRaw === '' || isNaN(parseFloat(rappiRaw))) ? salePrice : parseFloat(rappiRaw);
     
     const currentStock = parseInt(document.getElementById('inv-modal-stock').value) || 0;
     const adjustQty = parseInt(document.getElementById('inv-modal-adjust').value) || 0;
