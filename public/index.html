@@ -163,10 +163,10 @@
                 <div class="form-group">
                   <label for="pos-payment-select">Payment Method</label>
                   <select id="pos-payment-select">
-                    <option value="Efectivo">Efectivo (Cash)</option>
-                    <option value="Nequi">Nequi</option>
-                    <option value="Bancolombia">Bancolombia Transfer</option>
-                    <option value="TC">Tarjeta de Crédito (TC)</option>
+                    <option value="Breb-B">Breb-B</option>
+                    <option value="Efectivo(Cash)">Efectivo(Cash)</option>
+                    <option value="Bancolombia">Bancolombia</option>
+                    <option value="Tarjeta Credito(TC)">Tarjeta Credito(TC)</option>
                   </select>
                 </div>
               </div>
@@ -181,7 +181,12 @@
               
               <div class="form-group">
                 <label for="delivery-complex">Complex / Residential name</label>
-                <input type="text" id="delivery-complex" placeholder="Conjunto residencial, edificio..." autocomplete="off">
+                <select id="delivery-complex">
+                  <option value="Ciudadela del valle">Ciudadela del valle</option>
+                  <option value="Ciudadela del Parque">Ciudadela del Parque</option>
+                  <option value="Laureles del Valle">Laureles del Valle</option>
+                  <option value="Externo">Externo</option>
+                </select>
               </div>
               
               <div class="form-group-grid">
@@ -193,6 +198,17 @@
                   <label for="delivery-apartment">Apartment</label>
                   <input type="text" id="delivery-apartment" placeholder="Apto 402..." autocomplete="off">
                 </div>
+              </div>
+
+              <div class="form-group">
+                <label for="pos-sale-type-select">Sale Type</label>
+                <select id="pos-sale-type-select">
+                  <option value="Venta Comercial">Venta Comercial</option>
+                  <option value="Venta Consumo Interno">Venta Consumo Interno</option>
+                  <option value="Donación">Donación</option>
+                  <option value="Muestra sin Valor Comercial">Muestra sin Valor Comercial</option>
+                  <option value="Evento/Feria">Evento/Feria</option>
+                </select>
               </div>
 
               <div class="form-group">
@@ -426,6 +442,7 @@
                     <th>Timestamp</th>
                     <th>Origin</th>
                     <th>Payment Method</th>
+                    <th>Sale Type</th>
                     <th>Items Count</th>
                     <th class="text-right">Total Amount</th>
                     <th>Delivery Apartment</th>
@@ -435,7 +452,7 @@
                 </thead>
                 <tbody id="report-sales-tbody">
                   <tr>
-                    <td colspan="8" class="text-center">Loading sales list from server...</td>
+                    <td colspan="9" class="text-center">Loading sales list from server...</td>
                   </tr>
                 </tbody>
               </table>

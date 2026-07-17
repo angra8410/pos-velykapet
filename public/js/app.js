@@ -504,6 +504,7 @@ const App = {
       const date = new Date(s.timestamp).toLocaleString();
       const origin = String(s.origin || 'tienda').toUpperCase();
       const payment = s.payment_method || 'Efectivo';
+      const saleType = s.sale_type || 'Venta Comercial';
       const itemsCount = s.item_count !== undefined ? s.item_count : (s.items ? s.items.length : 0);
       const total = Number(s.total_amount) || 0;
       const apt = s.delivery_apartment ? `${s.delivery_complex || ''} Apto ${s.delivery_apartment}` : 'N/A';
@@ -516,6 +517,7 @@ const App = {
           <td>${date}</td>
           <td><span class="origin-tag ${origin.toLowerCase()}">${origin}</span></td>
           <td>${payment}</td>
+          <td class="text-center"><span class="sale-type-tag">${saleType}</span></td>
           <td class="text-center">${itemsCount}</td>
           <td class="text-right font-medium">${dbHelper.formatCOP(total)}</td>
           <td>${apt}</td>

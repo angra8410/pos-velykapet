@@ -8,7 +8,7 @@
 const POS = {
   cart: [],
   currentOrigin: 'tienda', // tienda | Rappi | WhatsApp
-  currentPaymentMethod: 'Efectivo', // Efectivo | Nequi | Bancolombia | TC
+  currentPaymentMethod: 'Breb-B', // Breb-B | Efectivo(Cash) | Bancolombia | Tarjeta Credito(TC)
 
   init() {
     this.setupListeners();
@@ -133,6 +133,16 @@ const POS = {
     }
   },
 
+  // Change price manually
+  updatePrice(barcode, newPrice) {
+    const item = this.cart.find(item => item.barcode === barcode);
+    if (item) {
+      const parsedPrice = parseFloat(newPrice);
+      item.unit_price = isNaN(parsedPrice) || parsedPrice < 0 ? 0 : parsedPrice;
+      this.renderCart();
+    }
+  },
+
   // Remove item from cart
   removeItem(barcode) {
     this.cart = this.cart.filter(item => item.barcode !== barcode);
@@ -182,7 +192,11 @@ const POS = {
             <div class="product-title">${item.product_name}</div>
             <div class="product-subtitle">${item.barcode} | ${item.supplier}</div>
           </td>
-          <td class="text-right">${dbHelper.formatCOP(item.unit_price)}</td>
+          <td class="text-right">
+            <input type="number" class="price-input" value="${item.unit_price}" min="0" step="0.01"
+                   style="width: 100px; text-align: right; background: var(--bg-card); border: 1px solid var(--border-color); border-radius: var(--radius-sm); padding: 4px 8px; color: var(--text-main); font-size: 13px;"
+                   onchange="POS.updatePrice('${item.barcode}', this.value)">
+          </td>
           <td>
             <div class="quantity-control">
               <button class="qty-btn" onclick="POS.updateQuantity('${item.barcode}', ${item.quantity - 1})">-</button>
@@ -223,6 +237,9 @@ const POS = {
     const deliveryComplex = document.getElementById('delivery-complex')?.value.trim() || null;
     const notes = document.getElementById('delivery-notes')?.value.trim() || null;
     const transactionCode = document.getElementById('transaction-code')?.value.trim() || null;
+    
+    const saleTypeSelect = document.getElementById('pos-sale-type-select');
+    const saleType = saleTypeSelect ? saleTypeSelect.value : 'Venta Comercial';
 
     const totalAmount = this.cart.reduce((acc, item) => acc + (item.unit_price * item.quantity), 0);
 
@@ -230,6 +247,7 @@ const POS = {
       timestamp: new Date().toISOString(),
       origin: this.currentOrigin,
       payment_method: this.currentPaymentMethod,
+      sale_type: saleType,
       transaction_code: transactionCode,
       total_amount: totalAmount,
       delivery_tower: deliveryTower,
@@ -285,10 +303,29 @@ const POS = {
   },
 
   clearInputs() {
-    ['delivery-tower', 'delivery-apartment', 'delivery-complex', 'delivery-notes', 'transaction-code'].forEach(id => {
+    ['delivery-tower', 'delivery-apartment', 'delivery-notes', 'transaction-code'].forEach(id => {
       const el = document.getElementById(id);
       if (el) el.value = '';
     });
+    
+    // Reset select dropdowns
+    const complex = document.getElementById('delivery-complex');
+    if (complex) complex.selectedIndex = 0;
+
+    const saleType = document.getElementById('pos-sale-type-select');
+    if (saleType) saleType.selectedIndex = 0;
+
+    const payment = document.getElementById('pos-payment-select');
+    if (payment) {
+      payment.selectedIndex = 0;
+      this.currentPaymentMethod = payment.value;
+    }
+
+    const origin = document.getElementById('pos-origin-select');
+    if (origin) {
+      origin.selectedIndex = 0;
+      this.currentOrigin = origin.value;
+    }
   },
 
   // Feedback notifications

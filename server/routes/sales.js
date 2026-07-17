@@ -26,7 +26,7 @@ router.get('/', async (req, res) => {
       `SELECT s.id, s.local_id, s.timestamp, s.origin, s.payment_method,
               s.transaction_code, s.total_amount,
               s.delivery_tower, s.delivery_apartment, s.delivery_complex,
-              s.notes, s.created_at,
+              s.notes, s.created_at, s.sale_type,
               COUNT(si.id)::INT AS item_count
          FROM sales s
          LEFT JOIN sale_items si ON si.sale_id = s.id
@@ -86,7 +86,7 @@ router.post('/', async (req, res) => {
     const {
       local_id, timestamp, origin, payment_method, transaction_code,
       total_amount, delivery_tower, delivery_apartment, delivery_complex,
-      notes, items,
+      notes, items, sale_type,
     } = req.body;
 
     // Validate required fields
@@ -105,14 +105,15 @@ router.post('/', async (req, res) => {
     const saleRes = await client.query(
       `INSERT INTO sales
          (local_id, timestamp, origin, payment_method, transaction_code,
-          total_amount, delivery_tower, delivery_apartment, delivery_complex, notes)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
+          total_amount, delivery_tower, delivery_apartment, delivery_complex, notes, sale_type)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
        RETURNING id`,
       [
         local_id || null, timestamp, origin, payment_method,
         transaction_code || null, total_amount,
         delivery_tower || null, delivery_apartment || null,
         delivery_complex || null, notes || null,
+        sale_type || 'Venta Comercial',
       ]
     );
     const saleId = saleRes.rows[0].id;
