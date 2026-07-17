@@ -85,28 +85,70 @@ const App = {
     navButtons.forEach(btn => {
       btn.addEventListener('click', () => {
         const targetTab = btn.getAttribute('data-tab');
-        
-        // Update active class on buttons
-        navButtons.forEach(b => b.classList.remove('active'));
-        btn.classList.add('active');
-
-        // Toggle visibility of views
-        document.querySelectorAll('.tab-view').forEach(view => {
-          view.classList.remove('active');
-        });
-        const activeView = document.getElementById(targetTab);
-        if (activeView) activeView.classList.add('active');
-
-        this.activeTab = targetTab;
-        
-        // Trigger tab specific loads
-        if (targetTab === 'tab-inventory') {
-          this.loadInventory();
-        } else if (targetTab === 'tab-reports') {
-          this.loadReports();
-        }
+        this.switchTab(targetTab);
       });
     });
+
+    // Restore saved tab on load
+    const savedTab = localStorage.getItem('pos_active_tab') || 'tab-pos';
+    this.switchTab(savedTab);
+
+    // Sidebar Toggler Button
+    const btnToggle = document.getElementById('btn-toggle-sidebar');
+    const sidebar = document.getElementById('app-sidebar');
+    if (btnToggle && sidebar) {
+      // Load saved collapse status
+      const isCollapsed = localStorage.getItem('pos_sidebar_collapsed') === 'true';
+      if (isCollapsed) {
+        sidebar.classList.add('collapsed');
+      }
+
+      btnToggle.addEventListener('click', () => {
+        const collapsed = sidebar.classList.toggle('collapsed');
+        localStorage.setItem('pos_sidebar_collapsed', String(collapsed));
+      });
+    }
+
+    // Brand Logo Click handler: expand sidebar and switch to home (POS Checkout)
+    const brandLogo = document.querySelector('.header-logo');
+    if (brandLogo) {
+      brandLogo.addEventListener('click', () => {
+        // Expand sidebar if it was collapsed
+        if (sidebar && sidebar.classList.contains('collapsed')) {
+          sidebar.classList.remove('collapsed');
+          localStorage.setItem('pos_sidebar_collapsed', 'false');
+        }
+        // Switch to POS Checkout (Home view)
+        this.switchTab('tab-pos');
+      });
+    }
+  },
+
+  switchTab(targetTab) {
+    const navButtons = document.querySelectorAll('.nav-btn');
+    const btn = Array.from(navButtons).find(b => b.getAttribute('data-tab') === targetTab);
+    if (!btn) return;
+
+    // Update active class on buttons
+    navButtons.forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+
+    // Toggle visibility of views
+    document.querySelectorAll('.tab-view').forEach(view => {
+      view.classList.remove('active');
+    });
+    const activeView = document.getElementById(targetTab);
+    if (activeView) activeView.classList.add('active');
+
+    this.activeTab = targetTab;
+    localStorage.setItem('pos_active_tab', targetTab);
+    
+    // Trigger tab specific loads
+    if (targetTab === 'tab-inventory') {
+      this.loadInventory();
+    } else if (targetTab === 'tab-reports') {
+      this.loadReports();
+    }
   },
 
   // Bind Excel file pickers and progress UI
