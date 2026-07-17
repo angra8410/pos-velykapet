@@ -510,10 +510,10 @@ const POS = {
       const lineTotal = item.unit_price * item.quantity;
       return `
         <tr>
-          <td style="padding: 4px 0; vertical-align: top;">${item.product_name}<br/><span style="font-size: 10px; color: #555;">${item.barcode}</span></td>
-          <td style="padding: 4px 0; text-align: center; vertical-align: top;">${item.quantity}</td>
-          <td style="padding: 4px 0; text-align: right; vertical-align: top;">$${item.unit_price.toFixed(2)}</td>
-          <td style="padding: 4px 0; text-align: right; vertical-align: top;">$${lineTotal.toFixed(2)}</td>
+          <td style="padding: 6px 4px; vertical-align: top; text-align: left;">${item.product_name}<br/><span style="font-size: 9px; color: #555;">${item.barcode}</span></td>
+          <td style="padding: 6px 4px; text-align: center; vertical-align: top;">${item.quantity}</td>
+          <td style="padding: 6px 4px; text-align: right; vertical-align: top;">${dbHelper.formatCOP(item.unit_price)}</td>
+          <td style="padding: 6px 4px; text-align: right; vertical-align: top;">${dbHelper.formatCOP(lineTotal)}</td>
         </tr>
       `;
     }).join('');
@@ -613,10 +613,10 @@ const POS = {
         <table class="items-table">
           <thead>
             <tr>
-              <th style="width: 45%;">Producto</th>
-              <th class="text-center" style="width: 10%;">Cant</th>
-              <th class="text-right" style="width: 20%;">Precio</th>
-              <th class="text-right" style="width: 25%;">Total</th>
+              <th style="width: 40%; text-align: left; padding: 6px 4px;">Producto</th>
+              <th style="width: 12%; text-align: center; padding: 6px 4px;">Cant</th>
+              <th style="width: 24%; text-align: right; padding: 6px 4px;">Precio</th>
+              <th style="width: 24%; text-align: right; padding: 6px 4px;">Total</th>
             </tr>
           </thead>
           <tbody>
@@ -626,8 +626,8 @@ const POS = {
 
         <table class="totals-table">
           <tr>
-            <td style="font-weight: bold;">TOTAL:</td>
-            <td class="text-right" style="font-weight: bold; font-size: 15px;">$${sale.total_amount.toFixed(2)}</td>
+            <td style="font-weight: bold; padding: 6px 4px;">TOTAL:</td>
+            <td class="text-right" style="font-weight: bold; font-size: 15px; padding: 6px 4px;">${dbHelper.formatCOP(sale.total_amount)}</td>
           </tr>
         </table>
 
