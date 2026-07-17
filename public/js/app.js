@@ -13,6 +13,7 @@ const App = {
     this.setupImporterUI();
     this.setupSearch();
     this.setupInventoryScanner();
+    this.setupModals();
     
     const authenticated = this.checkAuthStatus();
     if (!authenticated) {
@@ -23,6 +24,13 @@ const App = {
   },
 
   async bootstrapApp() {
+    // One-time startup migration to normalize existing local barcodes
+    try {
+      await dbHelper.migrateLocalBarcodes();
+    } catch (migErr) {
+      console.warn('[App] Local barcode migration failed:', migErr);
+    }
+
     // Bootstrap other modules
     SyncEngine.init();
     POS.init();
@@ -596,6 +604,46 @@ const App = {
     });
   },
 
+  // Setup click-away listeners and dirty-state tracking for modals
+  setupModals() {
+    this.isInventoryDirty = false;
+    this.isExpenseDirty = false;
+
+    // Track input events to mark form as dirty
+    const invForm = document.getElementById('inventory-modal-form');
+    if (invForm) {
+      invForm.addEventListener('input', () => {
+        this.isInventoryDirty = true;
+      });
+    }
+
+    const expForm = document.getElementById('expense-form');
+    if (expForm) {
+      expForm.addEventListener('input', () => {
+        this.isExpenseDirty = true;
+      });
+    }
+
+    // Click-away overlays
+    const invModal = document.getElementById('inventory-modal');
+    if (invModal) {
+      invModal.addEventListener('click', (e) => {
+        if (e.target === invModal) {
+          this.closeInventoryModal();
+        }
+      });
+    }
+
+    const expModal = document.getElementById('expense-modal');
+    if (expModal) {
+      expModal.addEventListener('click', (e) => {
+        if (e.target === expModal) {
+          this.closeExpenseModal();
+        }
+      });
+    }
+  },
+
   // Scanner form inside Inventory Stock tab
   setupInventoryScanner() {
     const scanForm = document.getElementById('inventory-scan-form');
@@ -624,6 +672,17 @@ const App = {
     const modal = document.getElementById('inventory-modal');
     if (!modal) return;
 
+    if (this.isInventoryDirty) {
+      this.showConfirm('You have unsaved changes. Do you want to discard them and register a new product?', 'Discard & Continue').then(discard => {
+        if (discard) {
+          this.isInventoryDirty = false;
+          this.openNewProductModal(prefilledBarcode);
+        }
+      });
+      return;
+    }
+
+    this.isInventoryDirty = false; // Reset dirty state
     const barcode = dbHelper.normalizeBarcode(prefilledBarcode);
 
     document.getElementById('inventory-modal-title').innerText = 'Register New Product';
@@ -662,6 +721,13 @@ const App = {
     const modal = document.getElementById('inventory-modal');
     if (!modal) return;
 
+    if (this.isInventoryDirty) {
+      const discard = await this.showConfirm('You have unsaved changes. Do you want to discard them and edit this product?', 'Discard & Continue');
+      if (!discard) return;
+      this.isInventoryDirty = false;
+    }
+
+    this.isInventoryDirty = false; // Reset dirty state
     barcode = dbHelper.normalizeBarcode(barcode);
     const product = await db.products.get(barcode);
     const catalog = await db.master_catalog.get(barcode);
@@ -698,7 +764,12 @@ const App = {
     document.getElementById('inv-modal-adjust').focus();
   },
 
-  closeInventoryModal() {
+  async closeInventoryModal(force = false) {
+    if (this.isInventoryDirty && !force) {
+      const discard = await this.showConfirm('You have unsaved changes. Are you sure you want to discard them?', 'Discard Changes');
+      if (!discard) return;
+    }
+    this.isInventoryDirty = false;
     const modal = document.getElementById('inventory-modal');
     if (modal) modal.classList.add('hidden');
   },
@@ -759,7 +830,7 @@ const App = {
       }
 
       POS.showToast('Product saved successfully!', 'success');
-      this.closeInventoryModal();
+      this.closeInventoryModal(true);
       
       // 3. Refresh Inventory Table View
       await this.loadInventory();
@@ -795,7 +866,7 @@ const App = {
       });
 
       POS.showToast('Product deleted successfully!', 'success');
-      this.closeInventoryModal();
+      this.closeInventoryModal(true);
       await this.loadInventory();
 
     } catch (err) {
@@ -871,6 +942,7 @@ const App = {
     const modal = document.getElementById('expense-modal');
     if (!modal) return;
     
+    this.isExpenseDirty = false; // Reset dirty state
     // Reset form fields
     document.getElementById('expense-form').reset();
     
@@ -887,7 +959,12 @@ const App = {
   },
 
   // Close manual expense modal
-  closeExpenseModal() {
+  async closeExpenseModal(force = false) {
+    if (this.isExpenseDirty && !force) {
+      const discard = await this.showConfirm('You have unsaved changes. Are you sure you want to discard them?', 'Discard Changes');
+      if (!discard) return;
+    }
+    this.isExpenseDirty = false;
     const modal = document.getElementById('expense-modal');
     if (modal) modal.classList.add('hidden');
   },
@@ -938,7 +1015,7 @@ const App = {
       }
 
       POS.showToast('Expense recorded successfully!', 'success');
-      this.closeExpenseModal();
+      this.closeExpenseModal(true);
 
       // 3. Reload reports view
       await this.loadReports();

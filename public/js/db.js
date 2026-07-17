@@ -66,6 +66,35 @@ const dbHelper = {
       await db.expenses.clear();
     });
     console.log('[Dexie] Local database cleared.');
+  },
+
+  // One-time startup migration to normalize existing local barcodes
+  async migrateLocalBarcodes() {
+    console.log('[Dexie] Checking local barcodes for normalization...');
+    await db.transaction('rw', db.products, db.master_catalog, async () => {
+      const allProducts = await db.products.toArray();
+      for (const p of allProducts) {
+        const norm = this.normalizeBarcode(p.barcode);
+        if (norm !== p.barcode) {
+          console.log(`[Dexie] Normalizing product barcode: ${p.barcode} -> ${norm}`);
+          await db.products.delete(p.barcode);
+          p.barcode = norm;
+          await db.products.put(p);
+        }
+      }
+      
+      const allCatalog = await db.master_catalog.toArray();
+      for (const c of allCatalog) {
+        const norm = this.normalizeBarcode(c.barcode);
+        if (norm !== c.barcode) {
+          console.log(`[Dexie] Normalizing catalog barcode: ${c.barcode} -> ${norm}`);
+          await db.master_catalog.delete(c.barcode);
+          c.barcode = norm;
+          await db.master_catalog.put(c);
+        }
+      }
+    });
+    console.log('[Dexie] Local barcode normalization check complete.');
   }
 };
 
