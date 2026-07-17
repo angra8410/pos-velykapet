@@ -20,6 +20,9 @@ pool.connect((err, client, release) => {
   const migrationQuery = `
     ALTER TABLE sales ADD COLUMN IF NOT EXISTS sale_type VARCHAR(50) DEFAULT 'Venta Comercial';
     ALTER TABLE sales ADD COLUMN IF NOT EXISTS invoice_number VARCHAR(100);
+    UPDATE sales 
+       SET invoice_number = 'VK-' || TO_CHAR(timestamp, 'YY') || '-1-' || LPAD(local_id::text, 5, '0')
+     WHERE invoice_number IS NULL AND local_id IS NOT NULL;
   `;
   client.query(migrationQuery, (alterErr) => {
     release();

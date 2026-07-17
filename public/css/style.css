@@ -1172,4 +1172,27 @@ button {
   border: 1px solid rgba(139, 92, 246, 0.2);
 }
 
+.sale-row-clickable {
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+}
+.sale-row-clickable:hover {
+  background-color: rgba(255, 255, 255, 0.04) !important;
+}
+.sale-row-clickable.expanded {
+  background-color: rgba(255, 255, 255, 0.02) !important;
+}
+
+.details-row {
+  background-color: rgba(0, 0, 0, 0.15) !important;
+}
+
+.spinner {
+  animation: spin 1s linear infinite;
+}
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
 

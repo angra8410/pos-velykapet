@@ -540,7 +540,7 @@ const App = {
       const localId = s.local_id || 'null';
 
       html += `
-        <tr>
+        <tr id="sale-row-${serverId || localId}" class="sale-row-clickable" onclick="App.handleSaleRowClick(event, ${serverId}, ${localId})">
           <td>
             <strong style="color: var(--text-main); font-size: 13px;">${s.invoice_number || `#L-${localId}`}</strong>
             <div style="font-size: 11px; color: var(--text-muted); margin-top: 2px;">${date}</div>
@@ -561,6 +561,105 @@ const App = {
       `;
     });
     tbody.innerHTML = html;
+  },
+
+  handleSaleRowClick(event, serverId, localId) {
+    // If they clicked the delete button or delete icon, don't toggle
+    if (event.target.closest('.delete')) {
+      return;
+    }
+    this.toggleSaleDetails(serverId, localId);
+  },
+
+  async toggleSaleDetails(serverId, localId) {
+    const mainRow = document.getElementById(`sale-row-${serverId || localId}`);
+    if (!mainRow) return;
+
+    const existingDetails = document.getElementById(`details-row-${serverId || localId}`);
+    if (existingDetails) {
+      existingDetails.remove();
+      mainRow.classList.remove('expanded');
+      return;
+    }
+
+    // Show a small loading indicator
+    mainRow.classList.add('expanded');
+    const loadingRow = document.createElement('tr');
+    loadingRow.id = `details-row-${serverId || localId}`;
+    loadingRow.className = 'details-row';
+    loadingRow.innerHTML = `
+      <td colspan="9" style="padding: 12px; text-align: center; color: var(--text-muted); font-size: 12px;">
+        <span class="material-icons-outlined spinner" style="vertical-align: middle; font-size: 16px; margin-right: 6px;">sync</span> Cargando productos...
+      </td>
+    `;
+    mainRow.parentNode.insertBefore(loadingRow, mainRow.nextSibling);
+
+    let items = [];
+    try {
+      // 1. Try to fetch from server if online and serverId is valid
+      const online = await api.checkHealth();
+      if (online && serverId && serverId !== 'null' && serverId !== 'undefined') {
+        const res = await api.fetchWithAuth(`/api/sales/${serverId}`);
+        if (res.ok) {
+          const body = await res.json();
+          if (body && body.data) {
+            items = body.data.items || [];
+          }
+        }
+      } else {
+        // 2. Fallback to local Dexie
+        const localSale = await db.sales.get(Number(localId));
+        if (localSale) {
+          items = localSale.items || [];
+        }
+      }
+    } catch (err) {
+      console.warn('[App] Failed to fetch sale details:', err);
+    }
+
+    // Render items
+    if (items.length === 0) {
+      loadingRow.innerHTML = `
+        <td colspan="9" style="padding: 12px; text-align: center; color: var(--text-muted); font-size: 12px;">
+          No se pudieron cargar los detalles del pedido.
+        </td>
+      `;
+      return;
+    }
+
+    loadingRow.innerHTML = `
+      <td colspan="9" style="padding: 0;">
+        <div class="sale-details-container" style="padding: 16px; background: rgba(255,255,255,0.02); border-bottom: 1px solid var(--border-color); margin: 0;">
+          <h4 style="margin: 0 0 10px 0; color: var(--text-main); font-size: 13px; font-weight: 600; display: flex; align-items: center;">
+            <span class="material-icons-outlined" style="margin-right: 6px; font-size: 18px; color: #8b5cf6;">shopping_bag</span>
+            Detalles del Pedido (${items.length} productos)
+          </h4>
+          <table style="width: 100%; border-collapse: collapse; font-size: 12px;">
+            <thead>
+              <tr style="border-bottom: 1px solid rgba(255,255,255,0.1); color: var(--text-muted); text-align: left;">
+                <th style="padding: 8px; font-weight: 500; text-align: left;">Producto</th>
+                <th style="padding: 8px; font-weight: 500; text-align: center; width: 15%;">Cantidad</th>
+                <th style="padding: 8px; font-weight: 500; text-align: right; width: 25%;">Precio Unitario</th>
+                <th style="padding: 8px; font-weight: 500; text-align: right; width: 25%;">Subtotal</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${items.map(item => `
+                <tr style="border-bottom: 1px solid rgba(255,255,255,0.03);">
+                  <td style="padding: 8px; color: var(--text-main);">
+                    <div style="font-weight: 500;">${item.product_name || 'Producto Desconocido'}</div>
+                    <div style="font-size: 10px; color: var(--text-muted); margin-top: 2px;">${item.barcode}</div>
+                  </td>
+                  <td style="padding: 8px; text-align: center; color: var(--text-main); font-weight: 500;">${item.quantity}</td>
+                  <td style="padding: 8px; text-align: right; color: var(--text-main);">${dbHelper.formatCOP(item.unit_price)}</td>
+                  <td style="padding: 8px; text-align: right; color: var(--text-main); font-weight: 600;">${dbHelper.formatCOP(item.unit_price * item.quantity)}</td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        </div>
+      </td>
+    `;
   },
 
   // Void / delete a completed sale
