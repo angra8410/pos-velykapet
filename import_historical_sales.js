@@ -218,7 +218,7 @@ async function migrate() {
       // Generate invoice number
       const year = sale.timestamp.getFullYear().toString().slice(-2);
       const seqStr = String(insertedSalesCount + 1).padStart(5, '0');
-      const invoiceNumber = `VK-HIST-${year}-${seqStr}`;
+      const invoiceNumber = `VKHIST${year}${seqStr}`;
 
       // Insert sale header
       const saleRes = await client.query(

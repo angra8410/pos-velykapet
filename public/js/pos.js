@@ -275,7 +275,7 @@ const POS = {
         const year = new Date(saleRecord.timestamp).getFullYear().toString().slice(-2);
         const deviceId = localStorage.getItem('pos_device_id') || '1';
         const seq = String(localId).padStart(5, '0');
-        const invoiceNum = `VK-${year}-${deviceId}-${seq}`;
+        const invoiceNum = `VK${year}${deviceId}${seq}`;
         
         await db.sales.update(localId, { invoice_number: invoiceNum });
         saleRecord.invoice_number = invoiceNum; // set on object in memory for receipt print

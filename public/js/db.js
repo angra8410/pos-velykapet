@@ -115,7 +115,7 @@ const dbHelper = {
           const year = new Date(s.timestamp).getFullYear().toString().slice(-2);
           const deviceId = localStorage.getItem('pos_device_id') || '1';
           const seq = String(s.local_id).padStart(5, '0');
-          const invoiceNum = `VK-${year}-${deviceId}-${seq}`;
+          const invoiceNum = `VK${year}${deviceId}${seq}`;
           
           await db.sales.update(s.local_id, { invoice_number: invoiceNum, synced: 0 });
           updatedCount++;
