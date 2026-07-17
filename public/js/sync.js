@@ -55,7 +55,7 @@ const SyncEngine = {
         if (result && result.results) {
           await db.transaction('rw', db.sales, async () => {
             for (const item of result.results) {
-              if (item.status === 'synced' || item.status === 'skipped') {
+              if (item.status === 'synced' || item.status === 'skipped' || item.status === 'updated') {
                 await db.sales.update(item.local_id, { synced: 1 });
               }
             }
