@@ -31,6 +31,19 @@ const ExcelImporter = {
       category: ['categoría gasto', 'categoria gasto', 'categoría', 'categoria', 'category', 'tipo'],
       payment_method: ['método pago', 'metodo pago', 'pago', 'payment_method', 'metodo_pago'],
       amount: ['monto', 'valor', 'total', 'precio', 'amount', 'costo']
+    },
+    purchases: {
+      timestamp: ['fecha', 'date', 'timestamp', 'dia', 'fecha compra'],
+      barcode: ['código producto', 'codigo producto', 'codigo', 'barcode', 'codigos', 'barcodes', 'codigo de barra', 'codigo de barras'],
+      product_name: ['producto', 'nombre producto', 'product_name', 'product', 'nombre', 'descripción', 'descripcion', 'description'],
+      category: ['categoría', 'categoria', 'category', 'tipo', 'group', 'grupo'],
+      supplier: ['proveedor', 'supplier', 'marca', 'supplier_name'],
+      quantity: ['cantidad', 'quantity', 'qty', 'cantidad compra'],
+      cost_price: ['costo unitario', 'cost_price', 'cost', 'costo', 'precio costo', 'costo_precio'],
+      total_price: ['total compra', 'total_compra', 'total_price', 'total', 'valor total'],
+      status: ['estado', 'status', 'disponible/vendido', 'estado (disponible/vendido)'],
+      lot_reference: ['lote/referencia', 'lote', 'referencia', 'lot', 'reference', 'lote_referencia'],
+      notes: ['notas', 'notes', 'comentarios', 'comentario']
     }
   },
   
@@ -107,8 +120,64 @@ const ExcelImporter = {
     return null;
   },
 
+  parseExcelDate(val) {
+    if (!val) return new Date();
+    // If it's a number (or string of a number)
+    const num = Number(val);
+    if (!isNaN(num) && num > 30000 && num < 60000) {
+      // Excel serial date starting from 1900-01-01
+      return new Date(Math.round((num - 25569) * 86400 * 1000));
+    }
+    const d = new Date(val);
+    if (!isNaN(d.getTime())) return d;
+    return new Date();
+  },
+
   // Transform raw sheet JSON data based on detected mapping
   transformData(rawJson, mapping, type) {
+    if (type === 'purchases') {
+      const purchasesList = [];
+      rawJson.forEach(row => {
+        const rawBarcode = row[mapping.barcode];
+        const productName = String(row[mapping.product_name] || '').trim();
+        
+        // If there is no product name, we skip it
+        if (!productName) return;
+
+        // Clean barcode or generate a fallback barcode
+        let barcode = dbHelper.normalizeBarcode(rawBarcode);
+        if (!barcode) {
+          barcode = dbHelper.generateFallbackBarcode(productName);
+        }
+
+        const quantity = this.parseIntNumber(row[mapping.quantity]) || 1;
+        const costPrice = this.parseNumber(row[mapping.cost_price]);
+        const totalPrice = this.parseNumber(row[mapping.total_price]) || (quantity * costPrice);
+        const timestamp = row[mapping.timestamp];
+        const dateVal = this.parseExcelDate(timestamp);
+        const category = String(row[mapping.category] || 'General').trim();
+        const supplier = String(row[mapping.supplier] || 'Unknown').trim();
+        const status = String(row[mapping.status] || 'Disponible').trim();
+        const lotRef = String(row[mapping.lot_reference] || '').trim();
+        const notes = String(row[mapping.notes] || row['Notas'] || '').trim();
+
+        purchasesList.push({
+          timestamp: dateVal.toISOString(),
+          barcode,
+          product_name: productName,
+          category,
+          supplier,
+          quantity,
+          cost_price: costPrice,
+          total_price: totalPrice,
+          status,
+          lot_reference: lotRef || null,
+          notes: notes || null
+        });
+      });
+      return purchasesList;
+    }
+
     if (type === 'expenses') {
       const expensesList = [];
       rawJson.forEach(row => {
@@ -257,5 +326,43 @@ const ExcelImporter = {
     }
 
     progressCallback('Expenses imported successfully ✓', 100);
+  },
+
+  // Import purchases rows (first Dexie, then PostgreSQL)
+  async importPurchases(rows, progressCallback) {
+    const batchSize = 250;
+    const total = rows.length;
+
+    progressCallback(`Saving ${total} purchases locally...`, 10);
+    // 1. Bulk save to Dexie
+    await db.transaction('rw', db.purchases, db.master_catalog, async () => {
+      // Auto-populate missing master_catalog entries from the purchases rows
+      const catalogEntries = rows
+        .filter(r => r.product_name)
+        .map(r => ({
+          barcode: r.barcode,
+          product_name: r.product_name,
+          category: r.category || 'General'
+        }));
+
+      if (catalogEntries.length > 0) {
+        await db.master_catalog.bulkPut(catalogEntries);
+      }
+
+      const synced = (window.SyncEngine && SyncEngine.onlineStatus) ? 1 : 0;
+      const dbRows = rows.map(r => ({ ...r, synced }));
+      await db.purchases.bulkPut(dbRows);
+    });
+
+    progressCallback('Syncing purchases with production database...', 40);
+    // 2. Bulk post to server in batches
+    for (let i = 0; i < total; i += batchSize) {
+      const batch = rows.slice(i, i + batchSize);
+      const pct = Math.floor(40 + (i / total) * 50);
+      progressCallback(`Syncing purchases batch ${i / batchSize + 1}...`, pct);
+      await api.importPurchasesBulk(batch);
+    }
+
+    progressCallback('Purchases imported successfully ✓', 100);
   }
 };

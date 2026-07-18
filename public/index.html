@@ -72,6 +72,10 @@
           <span class="material-icons-outlined">inventory_2</span>
           <span>Inventory Stock</span>
         </button>
+        <button class="nav-btn" data-tab="tab-purchases">
+          <span class="material-icons-outlined">shopping_bag</span>
+          <span>Purchases Log</span>
+        </button>
         <button class="nav-btn" data-tab="tab-import">
           <span class="material-icons-outlined">publish</span>
           <span>Excel Importer</span>
@@ -306,6 +310,96 @@
         </div>
       </section>
 
+      <!-- Tab 5: Purchases Log View -->
+      <section id="tab-purchases" class="tab-view">
+        <div class="reports-grid" style="margin-bottom: 20px;">
+          <!-- KPI Summary Cards -->
+          <div class="kpi-card card">
+            <span class="material-icons-outlined kpi-icon revenue" style="background-color: rgba(139, 92, 246, 0.1); color: var(--color-primary);">shopping_bag</span>
+            <div class="kpi-details">
+              <span>Total spent on purchases</span>
+              <h2 id="purchase-kpi-total-amount">$0.00</h2>
+            </div>
+          </div>
+          
+          <div class="kpi-card card">
+            <span class="material-icons-outlined kpi-icon sales" style="background-color: rgba(59, 130, 246, 0.1); color: var(--color-info);">inventory_2</span>
+            <div class="kpi-details">
+              <span>Total purchased items</span>
+              <h2 id="purchase-kpi-total-items">0</h2>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="panel-header" style="flex-wrap: wrap; gap: 12px;">
+            <div>
+              <h2>Purchases Traceability Log</h2>
+              <p class="panel-subtitle">History of all product acquisitions and unit costs</p>
+            </div>
+            
+            <div class="header-actions" style="display: flex; gap: 12px; flex-grow: 1; justify-content: flex-end; flex-wrap: wrap; align-items: center;">
+              <!-- Date Filters -->
+              <div style="display: flex; gap: 6px; align-items: center;">
+                <label for="purchase-filter-from" style="font-size: 12px; color: var(--text-muted); white-space: nowrap;">Desde:</label>
+                <input type="date" id="purchase-filter-from" style="background: var(--bg-card); border: 1px solid var(--border-color); border-radius: var(--radius-sm); padding: 4px 8px; color: var(--text-main); font-size: 13px;">
+                <label for="purchase-filter-to" style="font-size: 12px; color: var(--text-muted); white-space: nowrap;">Hasta:</label>
+                <input type="date" id="purchase-filter-to" style="background: var(--bg-card); border: 1px solid var(--border-color); border-radius: var(--radius-sm); padding: 4px 8px; color: var(--text-main); font-size: 13px;">
+              </div>
+              <!-- Supplier Filter -->
+              <div class="search-bar" style="margin: 0; min-width: 140px; background: var(--bg-card); display: flex; align-items: center; padding: 0 10px; border: 1px solid var(--border-color); border-radius: var(--radius-sm);">
+                <span class="material-icons-outlined" style="color: var(--text-muted); font-size: 20px; margin-right: 6px;">local_shipping</span>
+                <select id="purchase-supplier-select" style="background: transparent; border: none; color: var(--text-main); font-size: 13px; cursor: pointer; outline: none; width: 100%; height: 36px; padding: 0;">
+                  <option value="">All Suppliers</option>
+                </select>
+              </div>
+              <!-- Category Filter -->
+              <div class="search-bar" style="margin: 0; min-width: 140px; background: var(--bg-card); display: flex; align-items: center; padding: 0 10px; border: 1px solid var(--border-color); border-radius: var(--radius-sm);">
+                <span class="material-icons-outlined" style="color: var(--text-muted); font-size: 20px; margin-right: 6px;">filter_alt</span>
+                <select id="purchase-category-select" style="background: transparent; border: none; color: var(--text-main); font-size: 13px; cursor: pointer; outline: none; width: 100%; height: 36px; padding: 0;">
+                  <option value="">All Categories</option>
+                </select>
+              </div>
+              <!-- Search Bar -->
+              <div class="search-bar" style="margin: 0;">
+                <span class="material-icons-outlined">search</span>
+                <input type="text" id="purchase-search-input" placeholder="Search product name, barcode...">
+              </div>
+              <button class="btn-primary" onclick="App.openNewPurchaseModal()" style="display: flex; align-items: center; gap: 6px; cursor: pointer; height: 38px; background-color: var(--color-primary);">
+                <span class="material-icons-outlined">add_circle_outline</span>
+                <span>Add Purchase</span>
+              </button>
+            </div>
+          </div>
+
+          <div class="table-container">
+            <table class="inventory-table">
+              <thead>
+                <tr>
+                  <th>Date</th>
+                  <th>Barcode</th>
+                  <th>Product Name</th>
+                  <th>Category</th>
+                  <th>Supplier</th>
+                  <th class="text-right">Qty</th>
+                  <th class="text-right">Unit Cost</th>
+                  <th class="text-right">Total Cost</th>
+                  <th class="text-center">Status</th>
+                  <th>Lot / Ref</th>
+                  <th>Notes</th>
+                  <th class="text-center">Action</th>
+                </tr>
+              </thead>
+              <tbody id="purchases-tbody">
+                <tr>
+                  <td colspan="12" class="text-center">No purchases recorded yet</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
       <!-- Tab 3: Excel Importer Tab -->
       <section id="tab-import" class="tab-view">
         <div class="importer-grid">
@@ -391,6 +485,19 @@
                 <p>Drop the spreadsheet or click to select file. Mapped from sheet <em>'GASTOS'</em></p>
                 <input type="file" id="file-expenses-input" accept=".xlsx, .xls, .csv" class="hidden-file-input">
                 <button class="btn-secondary" onclick="document.getElementById('file-expenses-input').click()">Select File</button>
+              </div>
+            </div>
+
+            <!-- Card 4: Purchases Upload -->
+            <div class="card drop-card">
+              <div class="card-icon" style="background-color: rgba(139, 92, 246, 0.1); color: var(--color-primary);">
+                <span class="material-icons-outlined">shopping_bag</span>
+              </div>
+              <div class="drop-info">
+                <h3>4. Purchases Spreadsheet</h3>
+                <p>Drop the spreadsheet or click to select file. Mapped from sheet <em>'COMPRAS_INVENTARIO'</em></p>
+                <input type="file" id="file-purchases-input" accept=".xlsx, .xls, .csv" class="hidden-file-input">
+                <button class="btn-secondary" onclick="document.getElementById('file-purchases-input').click()">Select File</button>
               </div>
             </div>
 
@@ -724,6 +831,92 @@
     </div>
   </div>
 
+  <!-- Custom Purchase Modal -->
+  <div id="purchase-modal" class="modal-overlay hidden">
+    <div class="modal-card" style="width: 500px; max-width: 95%;">
+      <div class="modal-header">
+        <span class="material-icons-outlined modal-icon text-primary" style="color: var(--color-primary);">shopping_bag</span>
+        <h3>Record New Purchase</h3>
+      </div>
+      <form id="purchase-modal-form" onsubmit="App.savePurchase(event)">
+        <div class="modal-body" style="display: flex; flex-direction: column; gap: 14px; text-align: left;">
+          <!-- Date & Time -->
+          <div class="form-group">
+            <label for="pur-modal-date" style="font-weight: 500; font-size: 13px; color: var(--text-main); margin-bottom: 6px; display: block;">Date & Time *</label>
+            <input type="datetime-local" id="pur-modal-date" required class="form-control" style="width: 100%; box-sizing: border-box; background: var(--bg-card); border: 1px solid var(--border-color); border-radius: var(--radius-sm); padding: 10px; color: var(--text-main);">
+          </div>
+          <!-- Barcode -->
+          <div class="form-group">
+            <label for="pur-modal-barcode" style="font-weight: 500; font-size: 13px; color: var(--text-main); margin-bottom: 6px; display: block;">Barcode *</label>
+            <input type="text" id="pur-modal-barcode" required placeholder="Scan or type barcode..." class="form-control" style="width: 100%; box-sizing: border-box; background: var(--bg-card); border: 1px solid var(--border-color); border-radius: var(--radius-sm); padding: 10px; color: var(--text-main);">
+          </div>
+          <!-- Product Name -->
+          <div class="form-group">
+            <label for="pur-modal-name" style="font-weight: 500; font-size: 13px; color: var(--text-main); margin-bottom: 6px; display: block;">Product Name *</label>
+            <input type="text" id="pur-modal-name" required placeholder="Evolve Perro Classic..." class="form-control" style="width: 100%; box-sizing: border-box; background: var(--bg-card); border: 1px solid var(--border-color); border-radius: var(--radius-sm); padding: 10px; color: var(--text-main);">
+          </div>
+          <!-- Category and Supplier -->
+          <div class="form-group-grid" style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+            <div class="form-group">
+              <label for="pur-modal-category" style="font-weight: 500; font-size: 13px; color: var(--text-main); margin-bottom: 6px; display: block;">Category *</label>
+              <input type="text" id="pur-modal-category" required placeholder="SNACKS, ARENA, etc..." class="form-control" style="width: 100%; box-sizing: border-box; background: var(--bg-card); border: 1px solid var(--border-color); border-radius: var(--radius-sm); padding: 10px; color: var(--text-main);">
+            </div>
+            <div class="form-group">
+              <label for="pur-modal-supplier" style="font-weight: 500; font-size: 13px; color: var(--text-main); margin-bottom: 6px; display: block;">Supplier</label>
+              <input type="text" id="pur-modal-supplier" placeholder="Proveedor / CDM..." class="form-control" style="width: 100%; box-sizing: border-box; background: var(--bg-card); border: 1px solid var(--border-color); border-radius: var(--radius-sm); padding: 10px; color: var(--text-main);">
+            </div>
+          </div>
+          <!-- Qty, Cost Unitario, Total -->
+          <div class="form-group-grid" style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px;">
+            <div class="form-group">
+              <label for="pur-modal-quantity" style="font-weight: 500; font-size: 13px; color: var(--text-main); margin-bottom: 6px; display: block;">Quantity *</label>
+              <input type="number" id="pur-modal-quantity" min="1" required placeholder="e.g. 10" class="form-control" style="width: 100%; box-sizing: border-box; background: var(--bg-card); border: 1px solid var(--border-color); border-radius: var(--radius-sm); padding: 10px; color: var(--text-main);" oninput="App.calculatePurchaseTotal()">
+            </div>
+            <div class="form-group">
+              <label for="pur-modal-cost" style="font-weight: 500; font-size: 13px; color: var(--text-main); margin-bottom: 6px; display: block;">Cost Unit ($) *</label>
+              <input type="number" id="pur-modal-cost" step="0.01" min="0" required placeholder="0.00" class="form-control" style="width: 100%; box-sizing: border-box; background: var(--bg-card); border: 1px solid var(--border-color); border-radius: var(--radius-sm); padding: 10px; color: var(--text-main);" oninput="App.calculatePurchaseTotal()">
+            </div>
+            <div class="form-group">
+              <label for="pur-modal-total" style="font-weight: 500; font-size: 13px; color: var(--text-main); margin-bottom: 6px; display: block;">Total ($)</label>
+              <input type="number" id="pur-modal-total" step="0.01" min="0" placeholder="0.00" class="form-control" style="width: 100%; box-sizing: border-box; background: var(--bg-card); border: 1px solid var(--border-color); border-radius: var(--radius-sm); padding: 10px; color: var(--text-main);">
+            </div>
+          </div>
+          <!-- Estado and Lote -->
+          <div class="form-group-grid" style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+            <div class="form-group">
+              <label for="pur-modal-status" style="font-weight: 500; font-size: 13px; color: var(--text-main); margin-bottom: 6px; display: block;">Status *</label>
+              <select id="pur-modal-status" required class="form-control" style="width: 100%; box-sizing: border-box; background: var(--bg-card); border: 1px solid var(--border-color); border-radius: var(--radius-sm); padding: 10px; color: var(--text-main);">
+                <option value="Disponible" selected>Disponible</option>
+                <option value="Vendido">Vendido</option>
+                <option value="Donacion">Donación</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label for="pur-modal-lot" style="font-weight: 500; font-size: 13px; color: var(--text-main); margin-bottom: 6px; display: block;">Lot / Reference</label>
+              <input type="text" id="pur-modal-lot" placeholder="Lote / Referencia..." class="form-control" style="width: 100%; box-sizing: border-box; background: var(--bg-card); border: 1px solid var(--border-color); border-radius: var(--radius-sm); padding: 10px; color: var(--text-main);">
+            </div>
+          </div>
+          <!-- Notes -->
+          <div class="form-group">
+            <label for="pur-modal-notes" style="font-weight: 500; font-size: 13px; color: var(--text-main); margin-bottom: 6px; display: block;">Notes</label>
+            <textarea id="pur-modal-notes" rows="2" placeholder="Acquisition notes..." style="width: 100%; box-sizing: border-box; background: var(--bg-card); border: 1px solid var(--border-color); border-radius: var(--radius-sm); padding: 10px; color: var(--text-main); font-family: inherit; resize: vertical;"></textarea>
+          </div>
+          <!-- Inventory Integration Checkbox -->
+          <div style="display: flex; align-items: center; gap: 8px; margin-top: 4px;">
+            <input type="checkbox" id="pur-modal-update-inv" checked style="width: 16px; height: 16px; cursor: pointer;">
+            <label for="pur-modal-update-inv" style="font-size: 13px; color: var(--text-main); cursor: pointer; user-select: none;">
+              Actualizar inventario (Sumar cantidad al stock actual y actualizar costo unitario)
+            </label>
+          </div>
+        </div>
+        <div class="modal-footer" style="margin-top: 20px; display: flex; justify-content: flex-end; gap: 12px; align-items: center;">
+          <button type="button" class="btn-secondary" onclick="App.closePurchaseModal()">Cancel</button>
+          <button type="submit" class="btn-checkout" style="margin-top: 0; width: auto; background-color: var(--color-primary); border: none;">Save Purchase</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
   <!-- Price Lookup Modal -->
   <div id="price-lookup-modal" class="modal-overlay hidden" style="z-index: 2500;">
     <div class="modal-card" style="width: 500px; max-width: 95%; text-align: center;">
@@ -789,12 +982,12 @@
   <div id="toast-container" class="toast-container"></div>
 
   <!-- Main JavaScript Files bootstrapping the application -->
-  <script src="/js/db.js?v=1.0.4"></script>
-  <script src="/js/api.js?v=1.0.4"></script>
-  <script src="/js/sync.js?v=1.0.4"></script>
-  <script src="/js/import.js?v=1.0.4"></script>
-  <script src="/js/pos.js?v=1.0.4"></script>
-  <script src="/js/app.js?v=1.0.4"></script>
+  <script src="/js/db.js?v=1.0.5"></script>
+  <script src="/js/api.js?v=1.0.5"></script>
+  <script src="/js/sync.js?v=1.0.5"></script>
+  <script src="/js/import.js?v=1.0.5"></script>
+  <script src="/js/pos.js?v=1.0.5"></script>
+  <script src="/js/app.js?v=1.0.9"></script>
 
 </body>
 </html>

@@ -145,6 +145,61 @@ const api = {
     return await res.json();
   },
 
+  // Upload bulk purchases entries
+  async importPurchasesBulk(rows) {
+    const res = await this.fetchWithAuth(`${API_BASE}/purchases/bulk`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ rows })
+    });
+    if (!res.ok) {
+      const err = await res.json();
+      throw new Error(err.error || 'Bulk purchases import failed');
+    }
+    return await res.json();
+  },
+
+  // Get recent purchases list from server
+  async getPurchases(params = {}) {
+    const query = new URLSearchParams();
+    if (params.limit) query.append('limit', params.limit);
+    if (params.from) query.append('from', params.from);
+    if (params.to) query.append('to', params.to);
+    if (params.category) query.append('category', params.category);
+    if (params.supplier) query.append('supplier', params.supplier);
+    if (params.barcode) query.append('barcode', params.barcode);
+    
+    const res = await this.fetchWithAuth(`${API_BASE}/purchases?${query.toString()}`);
+    if (!res.ok) throw new Error('Failed to get purchases list');
+    return await res.json();
+  },
+
+  // Add single purchase entry
+  async addPurchase(purchasePayload) {
+    const res = await this.fetchWithAuth(`${API_BASE}/purchases`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(purchasePayload)
+    });
+    if (!res.ok) {
+      const err = await res.json();
+      throw new Error(err.error || 'Failed to add purchase entry');
+    }
+    return await res.json();
+  },
+
+  // Delete a specific purchase entry
+  async deletePurchase(id) {
+    const res = await this.fetchWithAuth(`${API_BASE}/purchases/${id}`, {
+      method: 'DELETE'
+    });
+    if (!res.ok) {
+      const err = await res.json();
+      throw new Error(err.error || 'Failed to delete purchase entry');
+    }
+    return await res.json();
+  },
+
   // Delete a specific product record by barcode (cascades on server)
   async deleteProduct(barcode) {
     const res = await this.fetchWithAuth(`${API_BASE}/catalog/${barcode}`, {

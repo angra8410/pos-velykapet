@@ -191,6 +191,8 @@ const App = {
       this.loadInventory();
     } else if (targetTab === 'tab-reports') {
       this.loadReports();
+    } else if (targetTab === 'tab-purchases') {
+      this.loadPurchases();
     }
   },
 
@@ -227,6 +229,16 @@ const App = {
       });
     }
 
+    const purchasesInput = document.getElementById('file-purchases-input');
+    if (purchasesInput) {
+      purchasesInput.addEventListener('change', async (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        await this.handleImport(file, 'purchases');
+        purchasesInput.value = ''; // clear
+      });
+    }
+
     const pullCloudBtn = document.getElementById('btn-pull-cloud');
     if (pullCloudBtn) {
       pullCloudBtn.addEventListener('click', () => this.handlePullFromCloud());
@@ -243,7 +255,7 @@ const App = {
     if (!progressCard) return;
 
     progressCard.classList.remove('hidden');
-    progressTitle.innerText = `Parsing ${type === 'catalog' ? 'Master Catalog' : (type === 'inventory' ? 'Live Inventory' : 'Expenses Log')}...`;
+    progressTitle.innerText = `Parsing ${type === 'catalog' ? 'Master Catalog' : (type === 'inventory' ? 'Live Inventory' : (type === 'purchases' ? 'Purchases Log' : 'Expenses Log'))}...`;
     progressBarFill.style.width = '0%';
     progressStatus.innerText = 'Reading file...';
 
@@ -266,6 +278,9 @@ const App = {
         if (found) sheetName = found;
       } else if (type === 'expenses') {
         const found = workbook.SheetNames.find(n => n.toLowerCase().includes('gastos'));
+        if (found) sheetName = found;
+      } else if (type === 'purchases') {
+        const found = workbook.SheetNames.find(n => n.toLowerCase().includes('compra'));
         if (found) sheetName = found;
       }
 
@@ -314,6 +329,8 @@ const App = {
         await ExcelImporter.importProducts(rows, updateProgress);
       } else if (type === 'expenses') {
         await ExcelImporter.importExpenses(rows, updateProgress);
+      } else if (type === 'purchases') {
+        await ExcelImporter.importPurchases(rows, updateProgress);
       }
 
       POS.showToast('Import completed successfully!', 'success');
@@ -560,6 +577,32 @@ const App = {
     if (categorySelect) {
       categorySelect.addEventListener('change', () => this.loadInventory());
     }
+
+    const purSearchInput = document.getElementById('purchase-search-input');
+    if (purSearchInput) {
+      purSearchInput.addEventListener('input', () => this.loadPurchases());
+    }
+
+    // Purchases Log Filters
+    const purFromInput = document.getElementById('purchase-filter-from');
+    if (purFromInput) {
+      purFromInput.addEventListener('change', () => this.loadPurchases());
+    }
+
+    const purToInput = document.getElementById('purchase-filter-to');
+    if (purToInput) {
+      purToInput.addEventListener('change', () => this.loadPurchases());
+    }
+
+    const purSupplierSelect = document.getElementById('purchase-supplier-select');
+    if (purSupplierSelect) {
+      purSupplierSelect.addEventListener('change', () => this.loadPurchases());
+    }
+
+    const purCategorySelect = document.getElementById('purchase-category-select');
+    if (purCategorySelect) {
+      purCategorySelect.addEventListener('change', () => this.loadPurchases());
+    }
   },
 
   // Load analytics reports and recent sales log
@@ -716,9 +759,10 @@ const App = {
       const isFiltered = dateFrom || dateTo || selectedCategory;
       const labelPrefix = isFiltered ? "Period's" : "Today's";
       
-      const revSpan = document.querySelector('.kpi-card:nth-child(1) .kpi-details span');
-      const salesSpan = document.querySelector('.kpi-card:nth-child(2) .kpi-details span');
-      const profitSpan = document.querySelector('.kpi-card:nth-child(3) .kpi-details span');
+      const reportsTab = document.getElementById('tab-reports');
+      const revSpan = reportsTab ? reportsTab.querySelector('.kpi-card:nth-child(1) .kpi-details span') : null;
+      const salesSpan = reportsTab ? reportsTab.querySelector('.kpi-card:nth-child(2) .kpi-details span') : null;
+      const profitSpan = reportsTab ? reportsTab.querySelector('.kpi-card:nth-child(3) .kpi-details span') : null;
       
       if (revSpan) revSpan.innerText = `${labelPrefix} Revenue`;
       if (salesSpan) salesSpan.innerText = `${labelPrefix} Transactions`;
@@ -969,6 +1013,7 @@ const App = {
   setupModals() {
     this.isInventoryDirty = false;
     this.isExpenseDirty = false;
+    this.isPurchaseDirty = false;
 
     // Track input events to mark form as dirty
     const invForm = document.getElementById('inventory-modal-form');
@@ -982,6 +1027,13 @@ const App = {
     if (expForm) {
       expForm.addEventListener('input', () => {
         this.isExpenseDirty = true;
+      });
+    }
+
+    const purForm = document.getElementById('purchase-modal-form');
+    if (purForm) {
+      purForm.addEventListener('input', () => {
+        this.isPurchaseDirty = true;
       });
     }
 
@@ -1000,6 +1052,40 @@ const App = {
       expModal.addEventListener('click', (e) => {
         if (e.target === expModal) {
           this.closeExpenseModal();
+        }
+      });
+    }
+
+    const purModal = document.getElementById('purchase-modal');
+    if (purModal) {
+      purModal.addEventListener('click', (e) => {
+        if (e.target === purModal) {
+          this.closePurchaseModal();
+        }
+      });
+    }
+
+    // Autocomplete/lookup barcode in purchase modal
+    const purBarcode = document.getElementById('pur-modal-barcode');
+    if (purBarcode) {
+      purBarcode.addEventListener('change', async (e) => {
+        const barcode = dbHelper.normalizeBarcode(e.target.value);
+        if (!barcode) return;
+        
+        const product = await dbHelper.getProductByBarcode(barcode);
+        if (product) {
+          document.getElementById('pur-modal-name').value = product.product_name || '';
+          document.getElementById('pur-modal-category').value = product.category || '';
+          if (product.supplier) document.getElementById('pur-modal-supplier').value = product.supplier;
+          if (product.cost_price) document.getElementById('pur-modal-cost').value = product.cost_price;
+          this.calculatePurchaseTotal();
+        } else {
+          // If not in products, check master_catalog
+          const cat = await db.master_catalog.get(barcode);
+          if (cat) {
+            document.getElementById('pur-modal-name').value = cat.product_name || '';
+            document.getElementById('pur-modal-category').value = cat.category || '';
+          }
         }
       });
     }
@@ -1470,6 +1556,387 @@ const App = {
     } catch (err) {
       console.error('[Expense] Failed to delete expense:', err);
       POS.showToast('Failed to delete expense: ' + err.message, 'error');
+    }
+  },
+
+  // Open manual purchase creation modal
+  openNewPurchaseModal() {
+    const modal = document.getElementById('purchase-modal');
+    if (!modal) return;
+
+    this.isPurchaseDirty = false; // Reset dirty state
+    
+    // Set date field to local current time
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = String(now.getMonth() + 1).padStart(2, '0');
+    const day = String(now.getDate()).padStart(2, '0');
+    const hours = String(now.getHours()).padStart(2, '0');
+    const minutes = String(now.getMinutes()).padStart(2, '0');
+    document.getElementById('pur-modal-date').value = `${year}-${month}-${day}T${hours}:${minutes}`;
+
+    document.getElementById('pur-modal-barcode').value = '';
+    document.getElementById('pur-modal-name').value = '';
+    document.getElementById('pur-modal-category').value = '';
+    document.getElementById('pur-modal-supplier').value = '';
+    document.getElementById('pur-modal-quantity').value = '';
+    document.getElementById('pur-modal-cost').value = '';
+    document.getElementById('pur-modal-total').value = '';
+    document.getElementById('pur-modal-status').value = 'Disponible';
+    document.getElementById('pur-modal-lot').value = '';
+    document.getElementById('pur-modal-notes').value = '';
+    document.getElementById('pur-modal-update-inv').checked = true;
+
+    modal.classList.remove('hidden');
+    setTimeout(() => document.getElementById('pur-modal-barcode').focus(), 100);
+  },
+
+  // Close manual purchase modal
+  async closePurchaseModal(force = false) {
+    if (this.isPurchaseDirty && !force) {
+      const discard = await this.showConfirm('You have unsaved changes. Are you sure you want to discard them?', 'Discard Changes');
+      if (!discard) return;
+    }
+    this.isPurchaseDirty = false;
+    const modal = document.getElementById('purchase-modal');
+    if (modal) modal.classList.add('hidden');
+  },
+
+  // Auto-calculate purchase total
+  calculatePurchaseTotal() {
+    const qtyInput = document.getElementById('pur-modal-quantity');
+    const costInput = document.getElementById('pur-modal-cost');
+    const totalInput = document.getElementById('pur-modal-total');
+
+    if (qtyInput && costInput && totalInput) {
+      const qty = parseInt(qtyInput.value) || 0;
+      const cost = parseFloat(costInput.value) || 0;
+      totalInput.value = (qty * cost).toFixed(2);
+    }
+  },
+
+  // Save manual purchase
+  async savePurchase(event) {
+    event.preventDefault();
+
+    const timestamp = document.getElementById('pur-modal-date').value;
+    const barcode = dbHelper.normalizeBarcode(document.getElementById('pur-modal-barcode').value);
+    const name = document.getElementById('pur-modal-name').value.trim();
+    const category = document.getElementById('pur-modal-category').value.trim();
+    const supplier = document.getElementById('pur-modal-supplier').value.trim() || 'Unknown';
+    const quantity = parseInt(document.getElementById('pur-modal-quantity').value) || 0;
+    const costPrice = parseFloat(document.getElementById('pur-modal-cost').value) || 0;
+    const totalPrice = parseFloat(document.getElementById('pur-modal-total').value) || (quantity * costPrice);
+    const status = document.getElementById('pur-modal-status').value;
+    const lotReference = document.getElementById('pur-modal-lot').value.trim() || null;
+    const notes = document.getElementById('pur-modal-notes').value.trim() || null;
+    const updateInventory = document.getElementById('pur-modal-update-inv').checked;
+
+    if (!timestamp || !barcode || !name || quantity <= 0 || costPrice < 0) {
+      POS.showToast('Please fill out all required fields correctly.', 'error');
+      return;
+    }
+
+    const purchaseRecord = {
+      timestamp: new Date(timestamp).toISOString(),
+      barcode,
+      product_name: name,
+      category,
+      supplier,
+      quantity,
+      cost_price: costPrice,
+      total_price: totalPrice,
+      status,
+      lot_reference: lotReference,
+      notes
+    };
+
+    try {
+      // 1. Save locally in Dexie
+      let localId;
+      await db.transaction('rw', db.purchases, db.master_catalog, db.products, async () => {
+        // Ensure master_catalog record exists
+        await db.master_catalog.put({
+          barcode,
+          product_name: name,
+          category
+        });
+
+        // Insert purchase record (unsynced)
+        localId = await db.purchases.add({ ...purchaseRecord, synced: 0 });
+
+        // Update inventory if checked
+        if (updateInventory) {
+          const existing = await db.products.get(barcode);
+          if (existing) {
+            await db.products.update(barcode, {
+              stock: (existing.stock || 0) + quantity,
+              cost_price: costPrice,
+              supplier,
+              updated_at: new Date().toISOString()
+            });
+          } else {
+            await db.products.put({
+              barcode,
+              supplier,
+              cost_price: costPrice,
+              sale_price: 0,
+              rappi_price: 0,
+              stock: quantity,
+              updated_at: new Date().toISOString()
+            });
+          }
+        }
+      });
+
+      console.log(`[Purchase] Saved locally with localId: ${localId}`);
+
+      // 2. If online, attempt to push directly to PostgreSQL
+      if (SyncEngine.onlineStatus) {
+        try {
+          await api.addPurchase({ ...purchaseRecord, update_inventory: updateInventory });
+          // Mark as synced locally
+          await db.purchases.update(localId, { synced: 1 });
+          console.log(`[Purchase] Pushed and synced localId: ${localId} to server.`);
+        } catch (serverErr) {
+          console.warn('[Purchase] Failed to push directly to server, will sync in background:', serverErr);
+        }
+      }
+
+      POS.showToast('Purchase recorded successfully!', 'success');
+      this.closePurchaseModal(true);
+
+      // 3. Reload views
+      if (this.activeTab === 'tab-purchases') {
+        await this.loadPurchases();
+      } else if (this.activeTab === 'tab-inventory') {
+        await this.loadInventory();
+      }
+
+    } catch (err) {
+      console.error('[Purchase] Failed to save purchase:', err);
+      POS.showToast('Failed to save purchase: ' + err.message, 'error');
+    }
+  },
+
+  // Load and render purchases list
+  async loadPurchases() {
+    const tbody = document.getElementById('purchases-tbody');
+    if (!tbody) return;
+
+    try {
+      // 1. Fetch category & supplier mappings for filters from catalog and purchases
+      const supplierSelect = document.getElementById('purchase-supplier-select');
+      const categorySelect = document.getElementById('purchase-category-select');
+      
+      const allPurchases = await db.purchases.toArray();
+
+      if (supplierSelect && !supplierSelect.dataset.populated) {
+        const suppliers = [...new Set(allPurchases.map(p => p.supplier).filter(Boolean))].sort();
+        supplierSelect.innerHTML = '<option value="">All Suppliers</option>' +
+          suppliers.map(sup => `<option value="${sup}">${sup}</option>`).join('');
+        supplierSelect.dataset.populated = 'true';
+      }
+
+      if (categorySelect && !categorySelect.dataset.populated) {
+        const categories = [...new Set(allPurchases.map(p => p.category).filter(Boolean))].sort();
+        categorySelect.innerHTML = '<option value="">All Categories</option>' +
+          categories.map(cat => `<option value="${cat}">${cat}</option>`).join('');
+        categorySelect.dataset.populated = 'true';
+      }
+
+      // 2. Read filter values
+      const dateFrom = document.getElementById('purchase-filter-from')?.value || '';
+      const dateTo = document.getElementById('purchase-filter-to')?.value || '';
+      const selectedSup = supplierSelect ? supplierSelect.value : '';
+      const selectedCat = categorySelect ? categorySelect.value : '';
+      const searchInput = document.getElementById('purchase-search-input');
+      const searchQuery = searchInput ? searchInput.value.toLowerCase().trim() : '';
+
+      let list = [];
+
+      // If online, fetch purchases list from server
+      if (SyncEngine.onlineStatus) {
+        try {
+          const params = { limit: 250 };
+          if (dateFrom) params.from = dateFrom;
+          if (dateTo) params.to = dateTo;
+          if (selectedCat) params.category = selectedCat;
+          if (selectedSup) params.supplier = selectedSup;
+          
+          const serverRes = await api.getPurchases(params);
+          if (serverRes && serverRes.success) {
+            list = serverRes.data;
+          }
+        } catch (serverErr) {
+          console.warn('[Purchase] Failed to fetch purchases from server, using local fallback:', serverErr);
+          list = allPurchases;
+        }
+      } else {
+        list = allPurchases;
+      }
+
+      // 3. Fallback client-side filtering if offline or server load failed
+      if (!SyncEngine.onlineStatus || list === allPurchases) {
+        list = allPurchases.filter(p => {
+          if (dateFrom && p.timestamp < dateFrom) return false;
+          if (dateTo && p.timestamp > dateTo + 'T23:59:59') return false;
+          if (selectedSup && p.supplier !== selectedSup) return false;
+          if (selectedCat && p.category !== selectedCat) return false;
+          return true;
+        });
+      }
+
+      // Apply client-side text search (helps filter by name/barcode)
+      if (searchQuery) {
+        list = list.filter(p => 
+          (p.product_name || '').toLowerCase().includes(searchQuery) ||
+          (p.barcode || '').toLowerCase().includes(searchQuery) ||
+          (p.notes || '').toLowerCase().includes(searchQuery)
+        );
+      }
+
+      // Sort by date DESC
+      list.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+
+      // Calculate KPI metrics from the full local database matching the filters (ignores the 250 table limit)
+      const filteredAllPurchases = allPurchases.filter(p => {
+        if (dateFrom && p.timestamp < dateFrom) return false;
+        if (dateTo && p.timestamp > dateTo + 'T23:59:59') return false;
+        if (selectedSup && p.supplier !== selectedSup) return false;
+        if (selectedCat && p.category !== selectedCat) return false;
+        if (searchQuery) {
+          return (p.product_name || '').toLowerCase().includes(searchQuery) ||
+                 (p.barcode || '').toLowerCase().includes(searchQuery) ||
+                 (p.notes || '').toLowerCase().includes(searchQuery);
+        }
+        return true;
+      });
+
+      let spent = 0;
+      let itemsCount = 0;
+      filteredAllPurchases.forEach(p => {
+        spent += Number(p.total_price) || 0;
+        itemsCount += parseInt(p.quantity) || 0;
+      });
+
+      document.getElementById('purchase-kpi-total-amount').innerText = dbHelper.formatCOP(spent);
+      document.getElementById('purchase-kpi-total-items').innerText = itemsCount.toLocaleString();
+
+      const purchasesTab = document.getElementById('tab-purchases');
+      const spentSpan = purchasesTab ? purchasesTab.querySelector('.kpi-card:nth-child(1) .kpi-details span') : null;
+      const itemsSpan = purchasesTab ? purchasesTab.querySelector('.kpi-card:nth-child(2) .kpi-details span') : null;
+      
+      const isPurFiltered = dateFrom || dateTo || selectedSup || selectedCat || searchQuery;
+      const purLabelPrefix = isPurFiltered ? "Period's" : "Total";
+      
+      if (spentSpan) spentSpan.innerText = `${purLabelPrefix} spent on purchases`;
+      if (itemsSpan) itemsSpan.innerText = `${purLabelPrefix} purchased items`;
+
+      if (list.length === 0) {
+        tbody.innerHTML = `
+          <tr>
+            <td colspan="12" class="text-center text-muted" style="padding: 40px 0;">No purchases found matching filters.</td>
+          </tr>
+        `;
+        return;
+      }
+
+      tbody.innerHTML = list.map(p => {
+        const dateStr = new Date(p.timestamp).toLocaleString('es-CO', {
+          day: '2-digit',
+          month: '2-digit',
+          year: 'numeric',
+          hour: '2-digit',
+          minute: '2-digit',
+          hour12: false
+        });
+        const unitCost = dbHelper.formatCOP(p.cost_price);
+        const totalCost = dbHelper.formatCOP(p.total_price);
+        const idVal = p.id || `local_${p.local_id}`;
+
+        return `
+          <tr>
+            <td>${dateStr}</td>
+            <td><code>${p.barcode}</code></td>
+            <td><strong class="product-title-cell">${p.product_name}</strong></td>
+            <td><span class="category-tag">${p.category || 'General'}</span></td>
+            <td>${p.supplier || 'Unknown'}</td>
+            <td class="text-right"><strong>${p.quantity}</strong></td>
+            <td class="text-right">${unitCost}</td>
+            <td class="text-right font-medium text-success">${totalCost}</td>
+            <td class="text-center">
+              <span class="stock-pill ${p.status === 'Disponible' ? 'positive' : 'negative'}">
+                ${p.status}
+              </span>
+            </td>
+            <td>${p.lot_reference || '<span class="text-muted">N/A</span>'}</td>
+            <td style="max-width: 150px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${p.notes || ''}">
+              ${p.notes || ''}
+            </td>
+            <td class="text-center">
+              <button class="btn-icon delete" onclick="App.deletePurchaseTrigger('${idVal}', ${p.local_id || 'null'})" style="color: var(--color-danger); cursor: pointer;" title="Delete purchase">
+                <span class="material-icons-outlined">delete_outline</span>
+              </button>
+            </td>
+          </tr>
+        `;
+      }).join('');
+
+    } catch (err) {
+      console.error('[Purchase] Failed to load purchases list:', err);
+      tbody.innerHTML = `<tr><td colspan="12" class="text-center text-danger">Error loading purchases: ${err.message}</td></tr>`;
+    }
+  },
+
+  // Delete a purchase entry
+  async deletePurchaseTrigger(idVal, localId) {
+    const confirmed = await this.showConfirm('Are you absolutely sure you want to delete this purchase entry? This will permanently remove the record and adjust the product stock level.', 'Delete Purchase');
+    if (!confirmed) return;
+
+    try {
+      let purchase;
+      if (localId) {
+        purchase = await db.purchases.get(localId);
+      } else if (String(idVal).startsWith('local_')) {
+        const parsedLocalId = parseInt(idVal.split('_')[1]);
+        if (!isNaN(parsedLocalId)) {
+          purchase = await db.purchases.get(parsedLocalId);
+        }
+      }
+
+      // Revert product stock locally
+      if (purchase) {
+        await db.transaction('rw', db.purchases, db.products, async () => {
+          const prod = await db.products.get(purchase.barcode);
+          if (prod) {
+            await db.products.update(purchase.barcode, {
+              stock: Math.max(0, (prod.stock || 0) - purchase.quantity),
+              updated_at: new Date().toISOString()
+            });
+          }
+          await db.purchases.delete(purchase.local_id);
+        });
+      }
+
+      // If online and it has a server ID, delete from PostgreSQL database
+      if (SyncEngine.onlineStatus && idVal && !String(idVal).startsWith('local_')) {
+        await api.deletePurchase(idVal);
+        console.log(`[Purchase] Deleted purchase ID ${idVal} from server.`);
+      }
+
+      POS.showToast('Purchase entry deleted and inventory adjusted.', 'success');
+      
+      // Reload reports and purchases views
+      if (this.activeTab === 'tab-purchases') {
+        await this.loadPurchases();
+      } else if (this.activeTab === 'tab-inventory') {
+        await this.loadInventory();
+      }
+
+    } catch (err) {
+      console.error('[Purchase] Failed to delete purchase:', err);
+      POS.showToast('Failed to delete purchase: ' + err.message, 'error');
     }
   }
 };

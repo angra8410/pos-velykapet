@@ -80,6 +80,22 @@ const SyncEngine = {
         }
       }
 
+      // 3. Sync Purchases
+      const unsyncedPurchases = await db.purchases.where('synced').equals(0).toArray();
+      if (unsyncedPurchases.length > 0) {
+        console.log(`[Sync] Pushing ${unsyncedPurchases.length} purchase entry(ies) to server...`);
+        const payload = unsyncedPurchases.map(({ local_id, synced, ...rest }) => rest);
+        const result = await api.importPurchasesBulk(payload);
+        if (result && result.success) {
+          await db.transaction('rw', db.purchases, async () => {
+            for (const pur of unsyncedPurchases) {
+              await db.purchases.update(pur.local_id, { synced: 1 });
+            }
+          });
+          console.log(`[Sync] Successfully synchronized ${unsyncedPurchases.length} purchase(s) ✓`);
+        }
+      }
+
       console.log('[Sync] Database check complete ✓');
     } catch (err) {
       console.error('[Sync] Sync process failed:', err.message);
@@ -102,12 +118,13 @@ const SyncEngine = {
       statusEl.className = 'status-badge syncing';
       statusTextEl.innerText = 'Syncing...';
     } else {
-      // Check if there are any remaining unsynced sales or expenses
+      // Check if there are any remaining unsynced sales, expenses or purchases
       Promise.all([
         db.sales.where('synced').equals(0).count(),
-        db.expenses.where('synced').equals(0).count()
-      ]).then(([salesCount, expensesCount]) => {
-        const totalPending = salesCount + expensesCount;
+        db.expenses.where('synced').equals(0).count(),
+        db.purchases.where('synced').equals(0).count()
+      ]).then(([salesCount, expensesCount, purchasesCount]) => {
+        const totalPending = salesCount + expensesCount + purchasesCount;
         if (totalPending > 0) {
           statusEl.className = 'status-badge pending';
           statusTextEl.innerText = `${totalPending} pending sync`;

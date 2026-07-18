@@ -27,6 +27,14 @@ db.version(2).stores({
   expenses: '++local_id, timestamp, synced, category'
 });
 
+db.version(3).stores({
+  master_catalog: '&barcode, category',
+  products: '&barcode, supplier',
+  sales: '++local_id, timestamp, synced, origin, payment_method',
+  expenses: '++local_id, timestamp, synced, category',
+  purchases: '++local_id, timestamp, synced, barcode, supplier, category'
+});
+
 // Helper functions for common Dexie operations
 const dbHelper = {
   // Normalize barcode by trimming and removing leading zeros
@@ -35,6 +43,19 @@ const dbHelper = {
     const cleaned = String(barcode).trim();
     const stripped = cleaned.replace(/^0+/, '');
     return stripped === '' ? '0' : stripped;
+  },
+
+  // Generate a clean deterministic barcode for products without barcode
+  generateFallbackBarcode(name) {
+    if (!name) return 'GEN-TEMP-' + Date.now();
+    const clean = String(name)
+      .toUpperCase()
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "") // Remove accents
+      .replace(/[^A-Z0-9]/g, '-')
+      .replace(/-+/g, '-')
+      .replace(/^-|-$/g, '');
+    return `GEN-${clean.substring(0, 40)}`;
   },
 
   // Format currency with COP style dot separators for thousands, omitting all decimals
@@ -67,11 +88,12 @@ const dbHelper = {
 
   // Clear all local tables (useful for complete refresh / reset)
   async clearAll() {
-    await db.transaction('rw', db.master_catalog, db.products, db.sales, db.expenses, async () => {
+    await db.transaction('rw', db.master_catalog, db.products, db.sales, db.expenses, db.purchases, async () => {
       await db.master_catalog.clear();
       await db.products.clear();
       await db.sales.clear();
       await db.expenses.clear();
+      await db.purchases.clear();
     });
     console.log('[Dexie] Local database cleared.');
   },

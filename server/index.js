@@ -75,6 +75,7 @@ app.use('/api/products', require('./routes/products'));
 app.use('/api/sales',    require('./routes/sales'));
 app.use('/api/sync',     require('./routes/sync'));
 app.use('/api/expenses', require('./routes/expenses'));
+app.use('/api/purchases', require('./routes/purchases'));
 
 // ---------------------------------------------------------------
 // Catch-all: serve index.html for client-side routing (SPA)
