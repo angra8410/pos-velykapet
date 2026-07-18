@@ -33,6 +33,14 @@ const POS = {
       });
     }
 
+    // Hotkey listener for F2 key to trigger price lookup
+    window.addEventListener('keydown', (e) => {
+      if (e.key === 'F2') {
+        e.preventDefault();
+        this.openPriceLookupModal();
+      }
+    });
+
     // Origin selector change
     const originSelect = document.getElementById('pos-origin-select');
     if (originSelect) {
@@ -661,5 +669,130 @@ const POS = {
       iframe.contentWindow.focus();
       iframe.contentWindow.print();
     }, 250);
+  },
+
+  openPriceLookupModal() {
+    const modal = document.getElementById('price-lookup-modal');
+    const input = document.getElementById('price-lookup-input');
+    const result = document.getElementById('price-lookup-result');
+    if (!modal) return;
+    
+    // Reset lookup result
+    if (result) result.classList.add('hidden');
+    if (input) input.value = '';
+    
+    modal.classList.remove('hidden');
+    setTimeout(() => {
+      if (input) input.focus();
+    }, 100);
+  },
+
+  closePriceLookupModal() {
+    const modal = document.getElementById('price-lookup-modal');
+    if (modal) modal.classList.add('hidden');
+    
+    // Focus back on POS barcode scanner input
+    const posInput = document.getElementById('pos-scan-input');
+    if (posInput) posInput.focus();
+  },
+
+  async handlePriceLookupSubmit(event) {
+    event.preventDefault();
+    const input = document.getElementById('price-lookup-input');
+    if (!input) return;
+    const barcode = dbHelper.normalizeBarcode(input.value);
+    if (barcode) {
+      await this.lookupProductPrice(barcode);
+    }
+  },
+
+  async lookupProductPrice(barcode) {
+    const resultDiv = document.getElementById('price-lookup-result');
+    if (!resultDiv) return;
+
+    try {
+      const product = await dbHelper.getProductByBarcode(barcode);
+      if (!product) {
+        this.showToast(`Product with barcode ${barcode} not found!`, 'error');
+        this.playBeep(false);
+        resultDiv.classList.add('hidden');
+        return;
+      }
+
+      this.playBeep(true);
+      
+      // Update result details
+      document.getElementById('lookup-res-name').innerText = product.product_name;
+      document.getElementById('lookup-res-barcode').innerText = `Barcode: ${product.barcode}`;
+      document.getElementById('lookup-res-retail').innerText = dbHelper.formatCOP(product.sale_price);
+      document.getElementById('lookup-res-rappi').innerText = dbHelper.formatCOP(product.rappi_price);
+      
+      // Stock
+      const stock = product.stock || 0;
+      const stockPill = document.getElementById('lookup-res-stock-pill');
+      const stockText = document.getElementById('lookup-res-stock-text');
+      
+      stockPill.innerText = `${stock} units`;
+      if (stock <= 0) {
+        stockPill.className = 'stock-pill negative';
+        stockText.innerText = 'Out of Stock';
+      } else {
+        stockPill.className = 'stock-pill positive';
+        stockText.innerText = 'In Stock';
+      }
+
+      // Expiration Date
+      const expVal = document.getElementById('lookup-res-expiration');
+      if (product.expiration_date) {
+        const formattedDate = new Date(product.expiration_date + 'T00:00:00').toLocaleDateString('es-CO', {
+          day: '2-digit', month: '2-digit', year: 'numeric'
+        });
+        expVal.innerText = formattedDate;
+        
+        // Highlight if expired or near expiration
+        const expDate = new Date(product.expiration_date + 'T00:00:00');
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        const timeDiff = expDate.getTime() - today.getTime();
+        const daysDiff = Math.ceil(timeDiff / (1000 * 3600 * 24));
+        
+        if (daysDiff < 0) {
+          expVal.style.color = 'var(--color-danger)';
+          expVal.innerText += ' (EXPIRED / VENCIDO)';
+        } else if (daysDiff <= 30) {
+          expVal.style.color = '#f59e0b'; // amber
+          expVal.innerText += ` (Vence en ${daysDiff} días)`;
+        } else {
+          expVal.style.color = '';
+        }
+      } else {
+        expVal.innerText = 'N/A';
+        expVal.style.color = '';
+      }
+
+      // Add to Cart Button binding
+      const addBtn = document.getElementById('lookup-add-to-cart-btn');
+      // Recreate to clear previous event listeners
+      const newAddBtn = addBtn.cloneNode(true);
+      addBtn.replaceWith(newAddBtn);
+      
+      newAddBtn.addEventListener('click', async () => {
+        await this.scanProduct(barcode);
+        this.closePriceLookupModal();
+      });
+
+      resultDiv.classList.remove('hidden');
+      
+      // Clear input and focus it again so they can scan multiple items in a row
+      const input = document.getElementById('price-lookup-input');
+      if (input) {
+        input.value = '';
+        input.focus();
+      }
+
+    } catch (err) {
+      console.error('[POS] Lookup error:', err);
+      this.showToast('Error during price lookup', 'error');
+    }
   }
 };

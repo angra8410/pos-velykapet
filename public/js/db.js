@@ -60,7 +60,8 @@ const dbHelper = {
       cost_price: Number(product.cost_price) || 0,
       sale_price: Number(product.sale_price) || 0,
       rappi_price: Number(product.rappi_price) || 0,
-      stock: parseInt(product.stock) || 0
+      stock: parseInt(product.stock) || 0,
+      expiration_date: product.expiration_date || null
     };
   },
 

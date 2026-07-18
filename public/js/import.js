@@ -20,6 +20,7 @@ const ExcelImporter = {
       sale_price: ['precio final venta', 'precio venta', 'sale_price', 'price', 'precio', 'retail', 'venta', 'sale'],
       rappi_price: ['precio rappi', 'rappi_price', 'rappi', 'rappi price'],
       stock: ['stock actual', 'stock_actual', 'stock', 'cantidad', 'inventario', 'qty', 'quantity', 'existencias'],
+      expiration_date: ['fecha vencimiento', 'vencimiento', 'fecha_vencimiento', 'expiration_date', 'expiration', 'vence', 'vence_fecha', 'fecha de vencimiento'],
       // Extra fields to automatically populate master_catalog from inventory sheet if missing
       product_name: ['nombre producto', 'product_name', 'product', 'producto', 'name', 'nombre', 'descripción', 'descripcion', 'description'],
       category: ['categoría', 'categoria', 'category', 'tipo', 'group', 'grupo']
@@ -94,6 +95,18 @@ const ExcelImporter = {
     return isNaN(parsed) ? 0 : parsed;
   },
 
+  parseDate(val) {
+    if (!val) return null;
+    try {
+      // Excel dates can be parsed as Date object or serial number. If it is a string representation:
+      const d = new Date(val);
+      if (!isNaN(d.getTime())) {
+        return d.toISOString().slice(0, 10);
+      }
+    } catch (e) {}
+    return null;
+  },
+
   // Transform raw sheet JSON data based on detected mapping
   transformData(rawJson, mapping, type) {
     if (type === 'expenses') {
@@ -149,6 +162,7 @@ const ExcelImporter = {
         item.sale_price = this.parseNumber(row[mapping.sale_price]);
         item.rappi_price = this.parseNumber(row[mapping.rappi_price]) || item.sale_price; // fallback to sale price
         item.stock = this.parseIntNumber(row[mapping.stock]);
+        item.expiration_date = mapping.expiration_date ? this.parseDate(row[mapping.expiration_date]) : null;
         
         // Map extra product_name and category columns from inventory sheet
         item.product_name = String(row[mapping.product_name] || '').trim();

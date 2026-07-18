@@ -11,7 +11,7 @@ router.get('/', async (req, res) => {
     const result = await db.query(
       `SELECT p.id, p.barcode, mc.product_name, mc.category,
               p.supplier, p.cost_price, p.sale_price, p.rappi_price,
-              p.stock, p.updated_at
+              p.stock, p.updated_at, p.expiration_date
          FROM products p
          JOIN master_catalog mc ON mc.barcode = p.barcode
         ORDER BY mc.product_name`
@@ -33,7 +33,7 @@ router.get('/:barcode', async (req, res) => {
     const result = await db.query(
       `SELECT p.id, p.barcode, mc.product_name, mc.category,
               p.supplier, p.cost_price, p.sale_price, p.rappi_price,
-              p.stock, p.updated_at
+              p.stock, p.updated_at, p.expiration_date
          FROM products p
          JOIN master_catalog mc ON mc.barcode = p.barcode
         WHERE p.barcode = $1`,
@@ -57,23 +57,24 @@ router.get('/:barcode', async (req, res) => {
 // ---------------------------------------------------------------
 router.post('/', async (req, res) => {
   try {
-    const { barcode, supplier, cost_price, sale_price, rappi_price, stock } = req.body;
+    const { barcode, supplier, cost_price, sale_price, rappi_price, stock, expiration_date } = req.body;
     if (!barcode) {
       return res.status(400).json({ error: 'barcode is required' });
     }
 
     const result = await db.query(
-      `INSERT INTO products (barcode, supplier, cost_price, sale_price, rappi_price, stock, updated_at)
-            VALUES ($1, $2, $3, $4, $5, $6, NOW())
+      `INSERT INTO products (barcode, supplier, cost_price, sale_price, rappi_price, stock, expiration_date, updated_at)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())
        ON CONFLICT (barcode) DO UPDATE
            SET supplier    = EXCLUDED.supplier,
                cost_price  = EXCLUDED.cost_price,
                sale_price  = EXCLUDED.sale_price,
                rappi_price = EXCLUDED.rappi_price,
                stock       = EXCLUDED.stock,
+               expiration_date = EXCLUDED.expiration_date,
                updated_at  = NOW()
          RETURNING *`,
-      [barcode, supplier || null, cost_price || 0, sale_price || 0, rappi_price || 0, stock || 0]
+      [barcode, supplier || null, cost_price || 0, sale_price || 0, rappi_price || 0, stock || 0, expiration_date || null]
     );
 
     res.status(201).json({ data: result.rows[0] });
@@ -100,7 +101,7 @@ router.post('/bulk', async (req, res) => {
 
     let upserted = 0;
     for (const row of rows) {
-      const { barcode, supplier, cost_price, sale_price, rappi_price, stock, product_name, category } = row;
+      const { barcode, supplier, cost_price, sale_price, rappi_price, stock, product_name, category, expiration_date } = row;
       if (!barcode) continue;
 
       // Ensure the barcode exists in master_catalog first to prevent FK violation
@@ -112,16 +113,17 @@ router.post('/bulk', async (req, res) => {
       );
 
       await client.query(
-        `INSERT INTO products (barcode, supplier, cost_price, sale_price, rappi_price, stock, updated_at)
-              VALUES ($1, $2, $3, $4, $5, $6, NOW())
+        `INSERT INTO products (barcode, supplier, cost_price, sale_price, rappi_price, stock, expiration_date, updated_at)
+              VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())
          ON CONFLICT (barcode) DO UPDATE
              SET supplier    = EXCLUDED.supplier,
                  cost_price  = EXCLUDED.cost_price,
                  sale_price  = EXCLUDED.sale_price,
                  rappi_price = EXCLUDED.rappi_price,
                  stock       = EXCLUDED.stock,
+                 expiration_date = EXCLUDED.expiration_date,
                  updated_at  = NOW()`,
-        [barcode, supplier || null, cost_price || 0, sale_price || 0, rappi_price || 0, stock || 0]
+        [barcode, supplier || null, cost_price || 0, sale_price || 0, rappi_price || 0, stock || 0, expiration_date || null]
       );
       upserted++;
     }

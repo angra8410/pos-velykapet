@@ -400,6 +400,7 @@ const App = {
             sale_price: Number(p.sale_price) || 0,
             rappi_price: Number(p.rappi_price) || Number(p.sale_price) || 0,
             stock: parseInt(p.stock) || 0,
+            expiration_date: p.expiration_date || null,
             updated_at: p.updated_at || new Date().toISOString()
           });
 
@@ -430,12 +431,26 @@ const App = {
     if (!tbody) return;
 
     try {
+      // 1. Populate category filter dropdown dynamically
+      const categorySelect = document.getElementById('inventory-category-select');
+      if (categorySelect && !categorySelect.dataset.populated) {
+        const allCatalog = await db.master_catalog.toArray();
+        const categories = [...new Set(allCatalog.map(c => c.category).filter(Boolean))].sort();
+        
+        const currentValue = categorySelect.value;
+        categorySelect.innerHTML = '<option value="">All Categories</option>' +
+          categories.map(cat => `<option value="${cat}">${cat}</option>`).join('');
+        categorySelect.value = currentValue;
+        
+        categorySelect.dataset.populated = 'true';
+      }
+
       const products = await db.products.toArray();
       
       if (products.length === 0) {
         tbody.innerHTML = `
           <tr>
-            <td colspan="9" class="text-center" style="padding: 40px 0;">
+            <td colspan="11" class="text-center" style="padding: 40px 0;">
               No products found. 
               <button class="btn-primary" onclick="App.handlePullFromCloud()" style="display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; margin-left: 8px; cursor: pointer; height: auto; border: none; border-radius: 4px; font-weight: 500;">
                 <span class="material-icons-outlined" style="font-size: 16px;">cloud_download</span>
@@ -448,12 +463,31 @@ const App = {
         return;
       }
 
+      // Read filters
+      const selectedCat = categorySelect ? categorySelect.value : '';
+      const searchInput = document.getElementById('inventory-search-input');
+      const searchQuery = searchInput ? searchInput.value.toLowerCase().trim() : '';
+
       let html = '';
       for (const p of products) {
         const cat = await db.master_catalog.get(p.barcode);
         const name = cat ? cat.product_name : 'Unknown Product';
         const category = cat ? cat.category : 'General';
         
+        // Apply category filter
+        if (selectedCat && category !== selectedCat) continue;
+        
+        // Apply search query filter
+        const supplier = p.supplier || '';
+        const barcode = p.barcode || '';
+        if (searchQuery && 
+            !name.toLowerCase().includes(searchQuery) && 
+            !barcode.toLowerCase().includes(searchQuery) && 
+            !supplier.toLowerCase().includes(searchQuery) && 
+            !category.toLowerCase().includes(searchQuery)) {
+          continue;
+        }
+
         const stock = parseInt(p.stock) || 0;
         const stockClass = stock <= 0 ? 'negative' : 'positive';
 
@@ -465,6 +499,27 @@ const App = {
           minute: '2-digit',
           hour12: false
         }) : 'N/A';
+
+        // Expiration date tracking
+        let expStr = 'N/A';
+        let expStyle = '';
+        if (p.expiration_date) {
+          const expDate = new Date(p.expiration_date + 'T00:00:00');
+          expStr = expDate.toLocaleDateString('es-CO', { day: '2-digit', month: '2-digit', year: 'numeric' });
+          
+          const today = new Date();
+          today.setHours(0, 0, 0, 0);
+          const timeDiff = expDate.getTime() - today.getTime();
+          const daysDiff = Math.ceil(timeDiff / (1000 * 3600 * 24));
+          
+          if (daysDiff < 0) {
+            expStr += ' (VENCIDO)';
+            expStyle = 'color: var(--color-danger); font-weight: bold;';
+          } else if (daysDiff <= 30) {
+            expStr += ` (Vence ${daysDiff}d)`;
+            expStyle = 'color: #f59e0b; font-weight: bold;';
+          }
+        }
 
         html += `
           <tr>
@@ -478,6 +533,7 @@ const App = {
             <td class="text-center">
               <span class="stock-pill ${stockClass}">${stock} units</span>
             </td>
+            <td class="text-center" style="${expStyle}">${expStr}</td>
             <td class="text-center text-muted" style="font-size: 13px;">${dateStr}</td>
             <td class="text-center">
               <button class="btn-icon" onclick="App.openAdjustmentModal('${p.barcode}')" style="color: var(--color-primary); cursor: pointer;">
@@ -493,24 +549,17 @@ const App = {
     }
   },
 
-  // Setup search filter for inventory table
+  // Setup search filter and category filter for inventory table
   setupSearch() {
     const searchInput = document.getElementById('inventory-search-input');
-    if (!searchInput) return;
+    if (searchInput) {
+      searchInput.addEventListener('input', () => this.loadInventory());
+    }
 
-    searchInput.addEventListener('input', (e) => {
-      const query = e.target.value.toLowerCase().trim();
-      const rows = document.querySelectorAll('#inventory-tbody tr');
-
-      rows.forEach(row => {
-        const text = row.innerText.toLowerCase();
-        if (text.includes(query)) {
-          row.style.display = '';
-        } else {
-          row.style.display = 'none';
-        }
-      });
-    });
+    const categorySelect = document.getElementById('inventory-category-select');
+    if (categorySelect) {
+      categorySelect.addEventListener('change', () => this.loadInventory());
+    }
   },
 
   // Load analytics reports and recent sales log
@@ -524,14 +573,44 @@ const App = {
     const lastSyncTime = document.getElementById('report-last-sync-time');
 
     try {
-      // 1. Fetch recent sales log from server (Postgres)
-      const res = await api.checkHealth();
+      // 1. Populate category filter dropdown dynamically
+      const salesCategorySelect = document.getElementById('sales-filter-category');
+      if (salesCategorySelect && !salesCategorySelect.dataset.populated) {
+        const allCatalog = await db.master_catalog.toArray();
+        const categories = [...new Set(allCatalog.map(c => c.category).filter(Boolean))].sort();
+        
+        const currentValue = salesCategorySelect.value;
+        salesCategorySelect.innerHTML = '<option value="">Todas</option>' +
+          categories.map(cat => `<option value="${cat}">${cat}</option>`).join('');
+        salesCategorySelect.value = currentValue;
+        
+        salesCategorySelect.dataset.populated = 'true';
+      }
+
+      // Read filter values
+      const dateFrom = document.getElementById('sales-filter-from')?.value || '';
+      const dateTo = document.getElementById('sales-filter-to')?.value || '';
+      const selectedCategory = salesCategorySelect ? salesCategorySelect.value : '';
       const limitEl = document.getElementById('sales-filter-limit');
       const limitVal = Number(limitEl ? limitEl.value : 50);
 
+      // Fetch category mapping for client-side filtering and KPI calculations
+      const allCatalog = await db.master_catalog.toArray();
+      const barcodeToCategory = {};
+      allCatalog.forEach(c => {
+        barcodeToCategory[c.barcode] = c.category;
+      });
+
+      const res = await api.checkHealth();
+
       if (res) {
         // If server is online, fetch sales logs and metadata
-        const salesRes = await api.fetchWithAuth(`/api/sales?limit=${limitVal}`);
+        let url = `/api/sales?limit=${limitVal}`;
+        if (dateFrom) url += `&from=${dateFrom}`;
+        if (dateTo) url += `&to=${dateTo}`;
+        if (selectedCategory) url += `&category=${encodeURIComponent(selectedCategory)}`;
+
+        const salesRes = await api.fetchWithAuth(url);
         if (salesRes.ok) {
           const salesData = await salesRes.json();
           this.renderSalesLogTable(salesData.data);
@@ -556,26 +635,67 @@ const App = {
         }
       } else {
         // Fallback to local Dexie logs if offline
-        const localSales = await db.sales.orderBy('timestamp').reverse().limit(limitVal).toArray();
-        this.renderSalesLogTable(localSales);
+        let localSales = await db.sales.orderBy('timestamp').reverse().toArray();
+        localSales = localSales.filter(s => {
+          if (dateFrom && s.timestamp < dateFrom) return false;
+          if (dateTo && s.timestamp > dateTo + 'T23:59:59') return false;
+          if (selectedCategory) {
+            const hasCategoryItem = Array.isArray(s.items) && s.items.some(item => {
+              const cat = barcodeToCategory[item.barcode];
+              return cat === selectedCategory;
+            });
+            if (!hasCategoryItem) return false;
+          }
+          return true;
+        });
 
-        const localExpenses = await db.expenses.orderBy('timestamp').reverse().limit(limitVal).toArray();
-        this.renderExpensesLogTable(localExpenses);
+        this.renderSalesLogTable(localSales.slice(0, limitVal));
+
+        let localExpenses = await db.expenses.orderBy('timestamp').reverse().toArray();
+        localExpenses = localExpenses.filter(e => {
+          if (dateFrom && e.timestamp < dateFrom) return false;
+          if (dateTo && e.timestamp > dateTo + 'T23:59:59') return false;
+          return true;
+        });
+
+        this.renderExpensesLogTable(localExpenses.slice(0, limitVal));
 
         serverSalesCount.innerText = 'Offline';
         lastSyncTime.innerText = 'Offline';
       }
 
-      // 2. Calculate Today's KPIs locally from Dexie (ensures local-first offline KPI accuracy)
-      const todayStart = new Date();
-      todayStart.setHours(0, 0, 0, 0);
-
-      const sales = await db.sales.where('timestamp').above(todayStart.toISOString()).toArray();
+      // 2. Calculate KPIs locally from Dexie based on selected filters (or fallback to today)
+      let kpiSalesList = await db.sales.toArray();
+      
+      // Apply filters for KPIs
+      kpiSalesList = kpiSalesList.filter(s => {
+        if (dateFrom) {
+          if (s.timestamp < dateFrom) return false;
+        } else {
+          // If no "desde" is specified, default to today for KPIs (original behavior)
+          const todayStartStr = new Date();
+          todayStartStr.setHours(0, 0, 0, 0);
+          if (s.timestamp < todayStartStr.toISOString()) return false;
+        }
+        
+        if (dateTo) {
+          if (s.timestamp > dateTo + 'T23:59:59') return false;
+        }
+        
+        if (selectedCategory) {
+          const hasCategoryItem = Array.isArray(s.items) && s.items.some(item => {
+            const cat = barcodeToCategory[item.barcode];
+            return cat === selectedCategory;
+          });
+          if (!hasCategoryItem) return false;
+        }
+        return true;
+      });
 
       let revenue = 0;
       let profit = 0;
 
-      sales.forEach(sale => {
+      kpiSalesList.forEach(sale => {
         revenue += Number(sale.total_amount) || 0;
         
         // Sum profit of line items
@@ -589,8 +709,20 @@ const App = {
       });
 
       kpiRevenue.innerText = dbHelper.formatCOP(revenue);
-      kpiSales.innerText = sales.length;
+      kpiSales.innerText = kpiSalesList.length;
       kpiProfit.innerText = dbHelper.formatCOP(profit);
+
+      // Update KPI card headers dynamically
+      const isFiltered = dateFrom || dateTo || selectedCategory;
+      const labelPrefix = isFiltered ? "Period's" : "Today's";
+      
+      const revSpan = document.querySelector('.kpi-card:nth-child(1) .kpi-details span');
+      const salesSpan = document.querySelector('.kpi-card:nth-child(2) .kpi-details span');
+      const profitSpan = document.querySelector('.kpi-card:nth-child(3) .kpi-details span');
+      
+      if (revSpan) revSpan.innerText = `${labelPrefix} Revenue`;
+      if (salesSpan) salesSpan.innerText = `${labelPrefix} Transactions`;
+      if (profitSpan) profitSpan.innerText = `${labelPrefix} Estimated Profit`;
 
     } catch (err) {
       console.error('[App] Failed to load reports:', err);
@@ -936,6 +1068,7 @@ const App = {
     document.getElementById('inv-modal-stock').value = '0';
     document.getElementById('inv-modal-adjust').value = '0';
     document.getElementById('inv-modal-adjust').placeholder = 'Initial stock level';
+    document.getElementById('inv-modal-expiration').value = '';
     
     const updatedAtEl = document.getElementById('inv-modal-updated-at');
     if (updatedAtEl) updatedAtEl.innerText = 'N/A';
@@ -991,6 +1124,7 @@ const App = {
     document.getElementById('inv-modal-stock').value = product.stock || 0;
     document.getElementById('inv-modal-adjust').value = '0';
     document.getElementById('inv-modal-adjust').placeholder = 'e.g. 10 or -5';
+    document.getElementById('inv-modal-expiration').value = product.expiration_date ? product.expiration_date.slice(0, 10) : '';
     
     const updatedAtEl = document.getElementById('inv-modal-updated-at');
     if (updatedAtEl) {
@@ -1034,6 +1168,7 @@ const App = {
     
     const currentStock = parseInt(document.getElementById('inv-modal-stock').value) || 0;
     const adjustQty = parseInt(document.getElementById('inv-modal-adjust').value) || 0;
+    const expirationDate = document.getElementById('inv-modal-expiration').value || null;
     
     const isNew = !document.getElementById('inv-modal-barcode').hasAttribute('readonly');
     const finalStock = Math.max(0, isNew ? adjustQty : (currentStock + adjustQty));
@@ -1051,6 +1186,7 @@ const App = {
       sale_price: salePrice,
       rappi_price: rappiPrice,
       stock: finalStock,
+      expiration_date: expirationDate,
       updated_at: new Date().toISOString()
     };
 

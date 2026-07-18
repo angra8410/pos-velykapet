@@ -99,6 +99,11 @@
             <div class="panel-header" style="flex-wrap: wrap; gap: 12px;">
               <h2>Active Cart</h2>
               <div class="pos-input-group" style="display: flex; gap: 12px; flex-grow: 1; justify-content: flex-end; flex-wrap: wrap;">
+                <!-- Price Lookup Button -->
+                <button type="button" class="btn-secondary" id="pos-lookup-btn" onclick="POS.openPriceLookupModal()" style="display: flex; align-items: center; gap: 6px; cursor: pointer; height: 38px;">
+                  <span class="material-icons-outlined">price_check</span>
+                  <span>Consultar Precio</span>
+                </button>
                 <!-- Scan Form -->
                 <form id="pos-scan-form" class="scan-bar" style="margin: 0; min-width: 250px;">
                   <span class="material-icons-outlined scan-icon">qr_code_scanner</span>
@@ -257,6 +262,13 @@
                 <span class="material-icons-outlined scan-icon">qr_code_scanner</span>
                 <input type="text" id="inventory-scan-input" placeholder="Scan Barcode to Edit/Add..." autocomplete="off">
               </form>
+              <!-- Category Filter -->
+              <div class="search-bar" style="margin: 0; min-width: 160px; background: var(--bg-card); display: flex; align-items: center; padding: 0 10px; border: 1px solid var(--border-color); border-radius: var(--radius-sm);">
+                <span class="material-icons-outlined" style="color: var(--text-muted); font-size: 20px; margin-right: 6px;">filter_alt</span>
+                <select id="inventory-category-select" style="background: transparent; border: none; color: var(--text-main); font-size: 13px; cursor: pointer; outline: none; width: 100%; height: 36px; padding: 0;">
+                  <option value="">All Categories</option>
+                </select>
+              </div>
               <!-- Search Bar -->
               <div class="search-bar" style="margin: 0;">
                 <span class="material-icons-outlined">search</span>
@@ -281,6 +293,7 @@
                   <th class="text-right">Retail Price</th>
                   <th class="text-right">Rappi Price</th>
                   <th class="text-center">Stock Level</th>
+                  <th class="text-center">Vencimiento</th>
                   <th class="text-center">Last Update</th>
                   <th class="text-center">Action</th>
                 </tr>
@@ -449,7 +462,21 @@
           <div class="card sales-log-card col-span-2">
             <div class="panel-header" style="flex-wrap: wrap; gap: 12px;">
               <h2>Recent Sales Log (Railway Postgres)</h2>
-              <div class="filter-group" style="display: flex; gap: 12px; align-items: center;">
+              <div class="filter-group" style="display: flex; gap: 12px; align-items: center; flex-wrap: wrap;">
+                <!-- Date Filters -->
+                <div style="display: flex; gap: 6px; align-items: center;">
+                  <label for="sales-filter-from" style="font-size: 12px; color: var(--text-muted); white-space: nowrap;">Desde:</label>
+                  <input type="date" id="sales-filter-from" onchange="App.loadReports()" style="background: var(--bg-card); border: 1px solid var(--border-color); border-radius: var(--radius-sm); padding: 4px 8px; color: var(--text-main); font-size: 13px;">
+                  <label for="sales-filter-to" style="font-size: 12px; color: var(--text-muted); white-space: nowrap;">Hasta:</label>
+                  <input type="date" id="sales-filter-to" onchange="App.loadReports()" style="background: var(--bg-card); border: 1px solid var(--border-color); border-radius: var(--radius-sm); padding: 4px 8px; color: var(--text-main); font-size: 13px;">
+                </div>
+                <!-- Category Filter for Sales -->
+                <div style="display: flex; gap: 6px; align-items: center;">
+                  <label for="sales-filter-category" style="font-size: 12px; color: var(--text-muted); white-space: nowrap;">Categoría:</label>
+                  <select id="sales-filter-category" onchange="App.loadReports()" style="background: var(--bg-card); border: 1px solid var(--border-color); border-radius: var(--radius-sm); padding: 4px 8px; color: var(--text-main); font-size: 13px; cursor: pointer; max-width: 150px;">
+                    <option value="">Todas</option>
+                  </select>
+                </div>
                 <div class="form-group" style="margin: 0; display: flex; align-items: center; gap: 6px;">
                   <label for="sales-filter-limit" style="font-size: 12px; color: var(--text-muted); margin: 0; white-space: nowrap;">Show:</label>
                   <select id="sales-filter-limit" onchange="App.loadReports()" style="background: var(--bg-card); border: 1px solid var(--border-color); border-radius: var(--radius-sm); padding: 4px 8px; color: var(--text-main); font-size: 13px; cursor: pointer;">
@@ -624,6 +651,11 @@
               <input type="number" id="inv-modal-adjust" value="0" placeholder="e.g. 10 or -5" class="form-control" style="width: 100%; box-sizing: border-box; background: var(--bg-card); border: 1px solid var(--border-color); border-radius: var(--radius-sm); padding: 10px; color: var(--text-main);">
             </div>
           </div>
+          <!-- Expiration Date -->
+          <div class="form-group">
+            <label for="inv-modal-expiration" style="font-weight: 500; font-size: 13px; color: var(--text-main); margin-bottom: 6px; display: block;">Expiration Date (Fecha de Vencimiento)</label>
+            <input type="date" id="inv-modal-expiration" class="form-control" style="width: 100%; box-sizing: border-box; background: var(--bg-card); border: 1px solid var(--border-color); border-radius: var(--radius-sm); padding: 10px; color: var(--text-main);">
+          </div>
           <div style="font-size: 12px; color: var(--text-muted); margin-top: -6px; margin-bottom: 6px;">
             Last stock update: <strong id="inv-modal-updated-at" style="color: var(--text-main);">N/A</strong>
           </div>
@@ -689,6 +721,67 @@
           <button type="submit" class="btn-checkout" style="margin-top: 0; width: auto; background-color: var(--color-success); border: none;">Save Expense</button>
         </div>
       </form>
+    </div>
+  </div>
+
+  <!-- Price Lookup Modal -->
+  <div id="price-lookup-modal" class="modal-overlay hidden" style="z-index: 2500;">
+    <div class="modal-card" style="width: 500px; max-width: 95%; text-align: center;">
+      <div class="modal-header" style="justify-content: center; position: relative;">
+        <span class="material-icons-outlined modal-icon text-primary" style="font-size: 36px; margin: 0;">price_check</span>
+        <h3 style="margin-left: 10px;">Consulta de Precio / Price Lookup</h3>
+        <button type="button" class="btn-icon" onclick="POS.closePriceLookupModal()" style="position: absolute; right: 10px; top: 10px; color: var(--text-muted); border: none; background: transparent; cursor: pointer;">
+          <span class="material-icons-outlined">close</span>
+        </button>
+      </div>
+      <div class="modal-body" style="padding-top: 10px;">
+        <form id="price-lookup-form" onsubmit="POS.handlePriceLookupSubmit(event)" style="margin-bottom: 20px;">
+          <div class="scan-bar" style="margin: 0 auto; width: 100%;">
+            <span class="material-icons-outlined scan-icon">qr_code_scanner</span>
+            <input type="text" id="price-lookup-input" placeholder="Scan Barcode to check price..." autocomplete="off">
+            <button type="submit" class="btn-primary">Consult</button>
+          </div>
+        </form>
+        
+        <div id="price-lookup-result" class="lookup-result-container hidden" style="text-align: left; background: rgba(255,255,255,0.02); border: 1px solid var(--border-color); border-radius: var(--radius-sm); padding: 20px; display: flex; flex-direction: column; gap: 14px;">
+          <!-- Product Name -->
+          <div style="border-bottom: 1px solid var(--border-color); padding-bottom: 10px;">
+            <h2 id="lookup-res-name" style="font-size: 20px; margin: 0; color: var(--text-main);">Product Name</h2>
+            <span id="lookup-res-barcode" style="font-size: 12px; color: var(--text-muted);">Barcode: 1234567890</span>
+          </div>
+          <!-- Prices Grid -->
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+            <div style="background: rgba(255,255,255,0.01); border: 1px solid var(--border-color); border-radius: var(--radius-sm); padding: 10px; text-align: center;">
+              <span style="font-size: 11px; color: var(--text-muted); display: block; text-transform: uppercase; font-weight: 500;">Retail Price</span>
+              <strong id="lookup-res-retail" style="font-size: 22px; color: var(--text-main); display: block; margin-top: 4px;">$0</strong>
+            </div>
+            <div style="background: rgba(139, 92, 246, 0.05); border: 1px solid rgba(139, 92, 246, 0.2); border-radius: var(--radius-sm); padding: 10px; text-align: center;">
+              <span style="font-size: 11px; color: #a78bfa; display: block; text-transform: uppercase; font-weight: 500;">Rappi Price</span>
+              <strong id="lookup-res-rappi" style="font-size: 22px; color: #a78bfa; display: block; margin-top: 4px;">$0</strong>
+            </div>
+          </div>
+          <!-- Stock Level -->
+          <div style="display: flex; justify-content: space-between; align-items: center; background: rgba(255,255,255,0.01); border: 1px solid var(--border-color); border-radius: var(--radius-sm); padding: 12px;">
+            <div>
+              <span style="font-size: 11px; color: var(--text-muted); display: block;">STOCK LEVEL</span>
+              <strong id="lookup-res-stock-text" style="font-size: 15px; color: var(--text-main);">In Stock</strong>
+            </div>
+            <span id="lookup-res-stock-pill" class="stock-pill positive" style="font-size: 13px; padding: 6px 12px;">0 units</span>
+          </div>
+          <!-- Expiration Date -->
+          <div id="lookup-res-expiration-container" style="display: flex; justify-content: space-between; align-items: center; background: rgba(255,255,255,0.01); border: 1px solid var(--border-color); border-radius: var(--radius-sm); padding: 12px;">
+            <div>
+              <span style="font-size: 11px; color: var(--text-muted); display: block;">FECHA DE VENCIMIENTO</span>
+              <strong id="lookup-res-expiration" style="font-size: 15px; color: var(--text-main);">N/A</strong>
+            </div>
+          </div>
+          <!-- Add to Cart Action -->
+          <button id="lookup-add-to-cart-btn" class="btn-checkout" style="margin-top: 10px; background-color: var(--color-primary); border: none; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px;">
+            <span class="material-icons-outlined" style="font-size: 18px;">add_shopping_cart</span>
+            <span>Add to Active Cart</span>
+          </button>
+        </div>
+      </div>
     </div>
   </div>
 

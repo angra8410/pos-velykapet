@@ -9,7 +9,7 @@ const db = require('../db');
 // ---------------------------------------------------------------
 router.get('/', async (req, res) => {
   try {
-    const { from, to, origin, payment_method, limit = 50, offset = 0 } = req.query;
+    const { from, to, origin, payment_method, category, limit = 50, offset = 0 } = req.query;
 
     const conditions = [];
     const params = [];
@@ -19,6 +19,14 @@ router.get('/', async (req, res) => {
     if (to)   { conditions.push(`s.timestamp <= $${idx++}`); params.push(to + ' 23:59:59'); }
     if (origin)         { conditions.push(`s.origin = $${idx++}`); params.push(origin); }
     if (payment_method) { conditions.push(`s.payment_method = $${idx++}`); params.push(payment_method); }
+    if (category) {
+      conditions.push(`EXISTS (
+        SELECT 1 FROM sale_items si_cat
+        JOIN master_catalog mc_cat ON mc_cat.barcode = si_cat.barcode
+        WHERE si_cat.sale_id = s.id AND mc_cat.category = $${idx++}
+      )`);
+      params.push(category);
+    }
 
     const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
 
