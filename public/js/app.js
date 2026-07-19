@@ -1799,8 +1799,9 @@ const App = {
       // Sort by date DESC
       list.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
 
-      // Calculate KPI metrics from the full local database matching the filters (ignores the 250 table limit)
-      const filteredAllPurchases = allPurchases.filter(p => {
+      // Calculate KPI metrics matching the filters (uses full local DB if present, or fallback to server list)
+      const kpiSource = (allPurchases && allPurchases.length > 0) ? allPurchases : list;
+      const filteredAllPurchases = kpiSource.filter(p => {
         if (dateFrom && p.timestamp < dateFrom) return false;
         if (dateTo && p.timestamp > dateTo + 'T23:59:59') return false;
         if (selectedSup && p.supplier !== selectedSup) return false;
