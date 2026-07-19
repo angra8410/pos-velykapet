@@ -9,7 +9,7 @@ const db = require('../db');
 // ---------------------------------------------------------------
 router.get('/', async (req, res, next) => {
   try {
-    const { from, to, category, supplier, barcode, limit = 100 } = req.query;
+    const { from, to, category, supplier, barcode, limit = 5000 } = req.query;
 
     const conditions = [];
     const params = [];
@@ -47,7 +47,7 @@ router.get('/', async (req, res, next) => {
        ORDER BY p.timestamp DESC
        LIMIT $${idx++}
     `;
-    params.push(parseInt(limit) || 100);
+    params.push(parseInt(limit) || 5000);
 
     const result = await db.query(queryText, params);
     res.json({ success: true, data: result.rows });

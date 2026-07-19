@@ -1758,7 +1758,7 @@ const App = {
       // If online, fetch purchases list from server
       if (SyncEngine.onlineStatus) {
         try {
-          const params = { limit: 250 };
+          const params = { limit: 5000 };
           if (dateFrom) params.from = dateFrom;
           if (dateTo) params.to = dateTo;
           if (selectedCat) params.category = selectedCat;
@@ -1799,9 +1799,9 @@ const App = {
       // Sort by date DESC
       list.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
 
-      // Calculate KPI metrics matching the filters (uses full local DB if present, or fallback to server list)
-      const kpiSource = (allPurchases && allPurchases.length > 0) ? allPurchases : list;
-      const filteredAllPurchases = kpiSource.filter(p => {
+      // Calculate KPI metrics matching the filters (uses server list if present, or fallback to local DB)
+      const kpiSource = (list && list.length > 0) ? list : allPurchases;
+      const filteredKPIs = kpiSource.filter(p => {
         if (dateFrom && p.timestamp < dateFrom) return false;
         if (dateTo && p.timestamp > dateTo + 'T23:59:59') return false;
         if (selectedSup && p.supplier !== selectedSup) return false;
@@ -1816,7 +1816,7 @@ const App = {
 
       let spent = 0;
       let itemsCount = 0;
-      filteredAllPurchases.forEach(p => {
+      filteredKPIs.forEach(p => {
         spent += Number(p.total_price) || 0;
         itemsCount += parseInt(p.quantity) || 0;
       });
@@ -1843,7 +1843,8 @@ const App = {
         return;
       }
 
-      tbody.innerHTML = list.map(p => {
+      const displayList = list.slice(0, 250);
+      tbody.innerHTML = displayList.map(p => {
         const dateStr = new Date(p.timestamp).toLocaleString('es-CO', {
           day: '2-digit',
           month: '2-digit',
