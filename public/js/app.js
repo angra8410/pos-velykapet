@@ -1278,9 +1278,15 @@ const App = {
 
     try {
       // 1. Save locally to Dexie (transactional)
-      await db.transaction('rw', db.master_catalog, db.products, async () => {
+      await db.transaction('rw', db.master_catalog, db.products, db.purchases, async () => {
         await db.master_catalog.put(catalogRecord);
         await db.products.put(productRecord);
+        
+        // Also update product_name and category across local purchases records matching this barcode
+        await db.purchases.where('barcode').equals(barcode).modify({
+          product_name: name,
+          category: category
+        });
       });
 
       console.log(`[Inventory] Manually saved barcode: ${barcode} in Dexie.`);
