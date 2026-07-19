@@ -42,7 +42,7 @@ const dbHelper = {
     if (barcode === undefined || barcode === null) return '';
     const cleaned = String(barcode).trim();
     const stripped = cleaned.replace(/^0+/, '');
-    return stripped === '' ? '0' : stripped;
+    return stripped;
   },
 
   // Generate a clean deterministic barcode for products without barcode

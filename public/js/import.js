@@ -122,14 +122,58 @@ const ExcelImporter = {
 
   parseExcelDate(val) {
     if (!val) return new Date();
-    // If it's a number (or string of a number)
+    if (val instanceof Date && !isNaN(val.getTime())) return val;
+
+    // If it's a number (or string of a number like "45916")
     const num = Number(val);
     if (!isNaN(num) && num > 30000 && num < 60000) {
       // Excel serial date starting from 1900-01-01
       return new Date(Math.round((num - 25569) * 86400 * 1000));
     }
-    const d = new Date(val);
+
+    const str = String(val).trim();
+    if (!str) return new Date();
+
+    // Try standard ISO / JS date parse first
+    let d = new Date(str);
     if (!isNaN(d.getTime())) return d;
+
+    // Handle Spanish / Latin America date formats (DD/MM/YYYY or D/M/YYYY or YYYY/MM/DD)
+    const parts = str.split(/[\/\-\.]/);
+    if (parts.length === 3) {
+      let day, month, year;
+      if (parts[0].length === 4) {
+        // YYYY-MM-DD or YYYY/MM/DD
+        year = parseInt(parts[0], 10);
+        month = parseInt(parts[1], 10) - 1;
+        day = parseInt(parts[2], 10);
+      } else {
+        const p0 = parseInt(parts[0], 10);
+        const p1 = parseInt(parts[1], 10);
+        const p2 = parseInt(parts[2], 10);
+        const fullYear = p2 < 100 ? 2000 + p2 : p2;
+
+        if (p0 > 12) {
+          // p0 is Day, p1 is Month
+          day = p0;
+          month = p1 - 1;
+          year = fullYear;
+        } else if (p1 > 12) {
+          // p1 is Day, p0 is Month
+          day = p1;
+          month = p0 - 1;
+          year = fullYear;
+        } else {
+          // Spanish format defaults to DD/MM/YYYY
+          day = p0;
+          month = p1 - 1;
+          year = fullYear;
+        }
+      }
+      d = new Date(year, month, day);
+      if (!isNaN(d.getTime())) return d;
+    }
+
     return new Date();
   },
 
@@ -138,7 +182,7 @@ const ExcelImporter = {
     if (type === 'purchases') {
       const purchasesList = [];
       rawJson.forEach(row => {
-        const rawBarcode = row[mapping.barcode];
+        const rawBarcode = row[mapping.barcode] || row['Barcode'] || row['Código producto'];
         const productName = String(row[mapping.product_name] || '').trim();
         
         // If there is no product name, we skip it
